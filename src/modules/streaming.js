@@ -1,9 +1,9 @@
-// modules/streaming.js — 流媒体：Netflix、Disney+、YouTube、Spotify 等
+// src/modules/streaming.js — 流媒体：Netflix、Disney+、YouTube、Spotify 等
 
-const { dustinRule, rulesetRule, trafficGroup, qureIcon } = require('../lib/helpers');
-const { mkOrder } = require('../lib/lazy');
+import { dustinRule, rulesetRule, trafficGroup, qureIcon } from '../lib/helpers.js';
+import { mkOrder } from '../lib/lazy.js';
 
-function streamingModule(final, prev, ctx) {
+export default function streamingModule(final, prev, ctx) {
     const domainSets = [
         "netflix", "disney", "max", "primevideo", "appletv",
         "youtube", "tiktok", "spotify", "media",
@@ -30,5 +30,3 @@ function streamingModule(final, prev, ctx) {
         },
     };
 }
-
-module.exports = streamingModule;

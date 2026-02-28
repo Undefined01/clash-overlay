@@ -1,9 +1,9 @@
-// modules/private.js — 私有网络 + 广告拦截
+// src/modules/private.js — 私有网络 + 广告拦截
 
-const { dustinRule, rulesetRule, trafficGroup, externalIcon } = require('../lib/helpers');
-const { mkOrder } = require('../lib/lazy');
+import { dustinRule, rulesetRule, trafficGroup, externalIcon } from '../lib/helpers.js';
+import { mkOrder } from '../lib/lazy.js';
 
-function privateModule(final, prev, ctx) {
+export default function privateModule(final, prev, ctx) {
     const priv = dustinRule("private");
     const ads  = dustinRule("ads");
     const privIp = dustinRule("privateip");
@@ -27,5 +27,3 @@ function privateModule(final, prev, ctx) {
         },
     };
 }
-
-module.exports = privateModule;

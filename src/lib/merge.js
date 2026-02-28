@@ -1,16 +1,16 @@
-// lib/merge.js
+// src/lib/merge.js
 // Clash configuration module merge engine.
 //
 // Each module contributes Clash-native config fragments. This engine merges
 // them with the correct strategy per field type, detects scalar conflicts,
 // and resolves deferred values with ordered list flattening.
 
-const {
-    deferred, isDeferred, resolveDeferred, applyOverlays,
+import {
+    isDeferred, resolveDeferred, applyOverlays,
     isPriorityWrapped, getPriorityType, unwrapPriority,
     isOrdered, isOrderedList, isArrayLike,
     DEFAULT_ORDER,
-} = require('./lazy');
+} from './lazy.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -46,24 +46,15 @@ function deepMerge(target, source) {
     return result;
 }
 
-// ─── Merge Strategy ─────────────────────────────────────────────────
-
 // ─── Ordered Array Helpers ─────────────────────────────────────────
 
 /**
  * Convert an array-like value to ordered segments.
- *
- * Supports:
- *   - Plain array: [a, b] → [{ order: 100, items: [a, b] }]
- *   - Ordered wrapper: mkOrder(30, [a]) → [{ order: 30, items: [a] }]
- *   - Ordered list (internal): pass through segments
- *   - Mixed array: [mkOrder(10, [a]), b, mkAfter([c])] → multiple segments
  */
 function toSegments(val) {
     if (isOrderedList(val)) return val.segments;
     if (isOrdered(val)) return [{ order: val.order, items: val.items }];
     if (Array.isArray(val)) {
-        // Check if contains ordered wrappers (mixed form)
         const hasOrdered = val.some(item => isOrdered(item));
         if (hasOrdered) {
             const segments = [];
@@ -96,29 +87,23 @@ function toSegments(val) {
  *
  * Scalar conflict resolution:
  *   - Same value → ok (idempotent)
- *   - mkDefault + mkOverride → mkOverride wins (the ONLY allowed silent override)
+ *   - mkDefault + mkOverride → mkOverride wins
  *   - Everything else with different values → error
  *
  * Array merge:
- *   - Arrays are collected as ordered segments via mkBefore/mkAfter/mkOrder
- *   - Plain arrays get default order (100)
- *   - Segments are sorted by order and flattened during resolution
+ *   - Arrays are collected as ordered segments
  *
  * Object merge:
  *   - Deep merge (recursive)
  *   - rule-providers: strict key-conflict detection
- *
- * @param {object} current - Accumulated state
- * @param {object} extension - New contributions from a module
- * @returns {object} Merged result
  */
-function clashModuleMerge(current, extension) {
+export function clashModuleMerge(current, extension) {
     const result = { ...current };
 
     for (const [key, extRaw] of Object.entries(extension)) {
         if (extRaw === undefined) continue;
 
-        // New key — just add it (converting non-metadata arrays to ordered lists)
+        // New key
         if (!(key in result) || result[key] === undefined) {
             if (!key.startsWith('_') && isArrayLike(extRaw)) {
                 result[key] = { __orderedList: true, segments: toSegments(extRaw) };
@@ -165,7 +150,6 @@ function clashModuleMerge(current, extension) {
         // ── Object fields: deep merge ──
         if (isPlainObject(curVal) && isPlainObject(extVal)) {
             if (key === 'rule-providers') {
-                // Strict merge: error on key conflict
                 for (const k of Object.keys(extVal)) {
                     if (k in curVal) {
                         throw new Error(`Rule provider key conflict: "${k}" already defined.`);
@@ -197,7 +181,7 @@ function clashModuleMerge(current, extension) {
             continue;
         }
         if (curType === 'override' && extType === 'default') {
-            continue; // already overridden, keep current
+            continue;
         }
 
         // All other different-value cases → error
@@ -215,11 +199,7 @@ function clashModuleMerge(current, extension) {
 // ─── Module System ──────────────────────────────────────────────────
 
 /**
- * The initial empty state for the Clash module system.
- * Sets up array/object fields so merge strategies apply correctly.
- *
- * @param {object} config - Original Clash config (from subscription)
- * @returns {object} Initial state with proxies from config
+ * Initial empty state for the Clash module system.
  */
 function initialModuleState(config) {
     return {
@@ -233,16 +213,11 @@ function initialModuleState(config) {
 /**
  * Merge modules into a Clash configuration.
  *
- * Modules are applied in registration order. Each module controls its
- * list positioning via mkBefore/mkAfter/mkOrder on array fields.
- * Each module is a function: `(final, prev, ctx) => contributions`
- *
  * @param {Array<Function>} modules - Module functions
  * @param {object} ctx - Shared context { args, config }
  * @returns {object} Fully merged and resolved Clash config
  */
-function mergeModules(modules, ctx) {
-    // Wrap modules to inject ctx
+export function mergeModules(modules, ctx) {
     const overlays = modules.map(mod => {
         return (final, prev) => mod(final, prev, ctx);
     });
@@ -253,11 +228,8 @@ function mergeModules(modules, ctx) {
 
 /**
  * Remove internal metadata keys (_* prefix) and empty objects from config.
- *
- * @param {object} config - Merged module output
- * @returns {object} Clean Clash configuration
  */
-function cleanup(config) {
+export function cleanup(config) {
     const result = {};
     for (const [key, value] of Object.entries(config)) {
         if (key.startsWith('_')) continue;
@@ -267,12 +239,3 @@ function cleanup(config) {
     }
     return result;
 }
-
-module.exports = {
-    clashModuleMerge,
-    deepMerge,
-    isPlainObject,
-    initialModuleState,
-    mergeModules,
-    cleanup,
-};

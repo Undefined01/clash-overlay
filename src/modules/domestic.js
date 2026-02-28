@@ -1,12 +1,12 @@
-// modules/domestic.js — 国内直连：CN 域名、国内应用、各大厂 CN 规则
+// src/modules/domestic.js — 国内直连：CN 域名、国内应用、各大厂 CN 规则
 
-const {
+import {
     makeRuleProvider, dustinRule, rulesetRule,
     trafficGroup, miniIcon,
-} = require('../lib/helpers');
-const { mkOrder } = require('../lib/lazy');
+} from '../lib/helpers.js';
+import { mkOrder } from '../lib/lazy.js';
 
-function domesticModule(final, prev, ctx) {
+export default function domesticModule(final, prev, ctx) {
     const cn       = dustinRule("cn");
     const cnIp     = dustinRule("cnip");
     const apps     = makeRuleProvider(
@@ -35,5 +35,3 @@ function domesticModule(final, prev, ctx) {
         },
     };
 }
-
-module.exports = domesticModule;

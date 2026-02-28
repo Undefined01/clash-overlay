@@ -1,20 +1,17 @@
-// modules/base-groups.js — 基础代理组：手动选择、延迟测试、负载均衡、国外 AI
-// 这些组被流量组引用为可选代理，不直接关联分流规则。
+// src/modules/base-groups.js — 基础代理组：手动选择、延迟测试、负载均衡、国外 AI
 
-const { deferred } = require('../lib/lazy');
-const { mkBefore } = require('../lib/lazy');
-const {
-    getGithub, miniIcon, qureIcon, externalIcon,
+import { mkBefore } from '../lib/lazy.js';
+import {
+    miniIcon, qureIcon, externalIcon,
     generalGroup, PRIMITIVE_GROUPS,
-} = require('../lib/helpers');
+} from '../lib/helpers.js';
 
-function baseGroupsModule(final, prev, ctx) {
+export default function baseGroupsModule(final, prev, ctx) {
     const proxies = ctx.config.proxies.map(p => p.name);
 
     const generalGroupNames = ["手动选择", "延迟测试", "负载均衡"];
 
     return {
-        // 内部元数据 —— 供 trafficGroup 的 deferred 引用
         _proxies: proxies,
         _allSelectables: [...generalGroupNames, ...proxies, ...PRIMITIVE_GROUPS],
 
@@ -50,5 +47,3 @@ function baseGroupsModule(final, prev, ctx) {
         ]),
     };
 }
-
-module.exports = baseGroupsModule;

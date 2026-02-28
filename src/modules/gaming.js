@@ -1,9 +1,9 @@
-// modules/gaming.js — 游戏平台
+// src/modules/gaming.js — 游戏平台
 
-const { dustinRule, rulesetRule, trafficGroup, miniIcon } = require('../lib/helpers');
-const { mkOrder } = require('../lib/lazy');
+import { dustinRule, rulesetRule, trafficGroup, miniIcon } from '../lib/helpers.js';
+import { mkOrder } from '../lib/lazy.js';
 
-function gamingModule(final, prev, ctx) {
+export default function gamingModule(final, prev, ctx) {
     const games   = dustinRule("games");
     const gamesIp = dustinRule("gamesip");
 
@@ -23,5 +23,3 @@ function gamingModule(final, prev, ctx) {
         },
     };
 }
-
-module.exports = gamingModule;

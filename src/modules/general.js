@@ -1,28 +1,23 @@
-// modules/general.js — 通用配置：入站、控制器、TUN、Geodata、嗅探
-// 通常客户端会覆盖这些设置，此处仅用于裸核启动时的最小可用配置。
+// src/modules/general.js — 通用配置：入站、控制器、TUN、Geodata、嗅探
 
-const { getGithub } = require('../lib/helpers');
+import { getGithub } from '../lib/helpers.js';
 
-function generalModule(final, prev, ctx) {
+export default function generalModule(final, prev, ctx) {
     const { ipv6Enabled } = ctx.args;
 
     return {
-        // ── 入站 ──
         "mixed-port": 7890,
         "allow-lan": true,
         "bind-address": "*",
 
-        // ── 外部控制 ──
         "external-controller": "[::]:9093",
         secret: "8db22dfa-c425-42ca-8d1d-5e1a62e232ef",
 
-        // ── UI (yacd) ──
         "external-ui": "ui",
         "external-ui-name": "yacd",
         "external-ui-url":
             "https://github.com/haishanh/yacd/archive/refs/heads/gh-pages.zip",
 
-        // ── 核心 ──
         mode: "rule",
         ipv6: ipv6Enabled,
         "unified-delay": true,
@@ -31,7 +26,6 @@ function generalModule(final, prev, ctx) {
         "global-client-fingerprint": "chrome",
         profile: { "store-selected": true, "store-fake-ip": true },
 
-        // ── Geodata ──
         "geo-auto-update": true,
         "geo-update-interval": 24,
         "geox-url": {
@@ -64,6 +58,3 @@ function generalModule(final, prev, ctx) {
         },
     };
 }
-
-module.exports = generalModule;
-
