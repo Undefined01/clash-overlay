@@ -1,12 +1,11 @@
-// lib/helpers.js
+// src/lib/helpers.js
 // Shared helpers for Clash override modules.
-// Extracted from the original override.js utility functions.
 
-const { deferred } = require('./lazy');
+import { deferred } from './lazy.js';
 
 // ─── Argument Parsing ───────────────────────────────────────────────
 
-function parseBool(value, defaultValue = false) {
+export function parseBool(value, defaultValue = false) {
     if (value === null || typeof value === "undefined") return defaultValue;
     if (typeof value === "boolean") return value;
     if (typeof value === "string") {
@@ -16,20 +15,20 @@ function parseBool(value, defaultValue = false) {
     throw new Error(`Invalid boolean value: ${value}`);
 }
 
-function parseNumber(value, defaultValue = 0) {
+export function parseNumber(value, defaultValue = 0) {
     if (value === null || typeof value === "undefined") return defaultValue;
     const num = parseInt(value, 10);
     return isNaN(num) ? defaultValue : num;
 }
 
-function parseString(defaultValue) {
+export function parseString(defaultValue) {
     return (value) => {
         if (value === null || typeof value === "undefined") return defaultValue;
         return String(value);
     };
 }
 
-function parseArgs(args) {
+export function parseArgs(args) {
     const spec = {
         ipv6Enabled: parseBool,
         dnsMode: parseString("fake-ip"),
@@ -42,14 +41,14 @@ function parseArgs(args) {
 
 // ─── URL / Icon Helpers ─────────────────────────────────────────────
 
-function getGithub(owner, repo, branch, path) {
+export function getGithub(owner, repo, branch, path) {
     return `https://fastly.jsdelivr.net/gh/${owner}/${repo}@${branch}/${path}`;
 }
 
-const miniIcon = (name) => getGithub("Orz-3", "mini", "master", `Color/${name}.png`);
-const qureIcon = (name) => getGithub("Koolson", "Qure", "master", `IconSet/Color/${name}.png`);
+export const miniIcon = (name) => getGithub("Orz-3", "mini", "master", `Color/${name}.png`);
+export const qureIcon = (name) => getGithub("Koolson", "Qure", "master", `IconSet/Color/${name}.png`);
 
-function externalIcon(id) {
+export function externalIcon(id) {
     return `https://img.icons8.com/?size=100&id=${id}&format=png&color=000000`;
 }
 
@@ -65,7 +64,7 @@ function externalIcon(id) {
  * @param {object} [overrides] - Override defaults
  * @returns {{ name: string, provider: object }}
  */
-function makeRuleProvider(owner, repo, branch, path, overrides = {}) {
+export function makeRuleProvider(owner, repo, branch, path, overrides = {}) {
     const name = path.match(/([\w\-_]+)\.(\w+)$/)[1];
     let behavior = name.endsWith("ip") ? "ipcidr" : "domain";
     let format;
@@ -100,7 +99,7 @@ function makeRuleProvider(owner, repo, branch, path, overrides = {}) {
  * Shorthand for DustinWin ruleset.
  * Returns { name, provider } where name is the ruleset name.
  */
-function dustinRule(name) {
+export function dustinRule(name) {
     return makeRuleProvider(
         "DustinWin", "ruleset_geodata", "mihomo-ruleset",
         `${name}.mrs`
@@ -115,14 +114,14 @@ function dustinRule(name) {
  * @param {...string} options - Additional options (e.g., 'no-resolve')
  * @returns {string}
  */
-function rulesetRule(rulesetName, proxy, ...options) {
+export function rulesetRule(rulesetName, proxy, ...options) {
     const optStr = options.map(opt => "," + opt).join("");
     return `RULE-SET,${rulesetName},${proxy}${optStr}`;
 }
 
 // ─── Proxy Group Helpers ────────────────────────────────────────────
 
-const GROUP_COMMON = {
+export const GROUP_COMMON = {
     type: "select",
     url: "https://www.gstatic.com/generate_204",
     interval: 300,
@@ -130,12 +129,12 @@ const GROUP_COMMON = {
     "max-failed-times": 2,
 };
 
-const PRIMITIVE_GROUPS = ["DIRECT", "REJECT"];
+export const PRIMITIVE_GROUPS = ["DIRECT", "REJECT"];
 
 /**
  * Reorder proxies list so `defaultProxy` is first.
  */
-function reorderProxies(proxies, defaultProxy) {
+export function reorderProxies(proxies, defaultProxy) {
     const reordered = [...proxies];
     if (defaultProxy) {
         const index = reordered.indexOf(defaultProxy);
@@ -153,11 +152,11 @@ function reorderProxies(proxies, defaultProxy) {
  * @param {string} name - Group name
  * @param {object} opts - Options
  * @param {string} opts.defaultProxy - Default proxy name (placed first)
- * @param {string} opts.icon - Full icon URL (use qureIcon/miniIcon/externalIcon explicitly)
+ * @param {string} opts.icon - Full icon URL
  * @param {object} [opts.overrides] - Additional group config overrides
  * @returns {object} Proxy group config
  */
-function trafficGroup(final, name, { defaultProxy, icon, ...overrides }) {
+export function trafficGroup(final, name, { defaultProxy, icon, ...overrides }) {
     return {
         ...GROUP_COMMON,
         name,
@@ -176,7 +175,7 @@ function trafficGroup(final, name, { defaultProxy, icon, ...overrides }) {
  * @param {object} opts - Group options including name, type, etc.
  * @returns {object} Proxy group config
  */
-function generalGroup(final, { name, proxies: explicitProxies, ...overrides }) {
+export function generalGroup(final, { name, proxies: explicitProxies, ...overrides }) {
     return {
         ...GROUP_COMMON,
         name,
@@ -191,35 +190,6 @@ function generalGroup(final, { name, proxies: explicitProxies, ...overrides }) {
  * Merge lists, filtering out falsy values. Supports nested arrays.
  * mergeList([1, 2], 3, [true && 4, false && 5]) => [1, 2, 3, 4]
  */
-function mergeList(...elements) {
+export function mergeList(...elements) {
     return elements.flat().filter(Boolean);
 }
-
-module.exports = {
-    // Arg parsing
-    parseBool,
-    parseNumber,
-    parseString,
-    parseArgs,
-
-    // URLs & Icons
-    getGithub,
-    miniIcon,
-    qureIcon,
-    externalIcon,
-
-    // Rulesets
-    makeRuleProvider,
-    dustinRule,
-    rulesetRule,
-
-    // Proxy groups
-    GROUP_COMMON,
-    PRIMITIVE_GROUPS,
-    reorderProxies,
-    trafficGroup,
-    generalGroup,
-
-    // Utility
-    mergeList,
-};

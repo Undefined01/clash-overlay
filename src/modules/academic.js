@@ -1,12 +1,12 @@
-// modules/academic.js — 学术网站 + 种子 Trackers
+// src/modules/academic.js — 学术网站 + 种子 Trackers
 
-const {
+import {
     makeRuleProvider, dustinRule, rulesetRule,
-    trafficGroup, externalIcon, miniIcon,
-} = require('../lib/helpers');
-const { mkOrder } = require('../lib/lazy');
+    trafficGroup, externalIcon,
+} from '../lib/helpers.js';
+import { mkOrder } from '../lib/lazy.js';
 
-function academicModule(final, prev, ctx) {
+export default function academicModule(final, prev, ctx) {
     const scholar = makeRuleProvider(
         "nerdneilsfield", "clash_rules_for_scholar", "master",
         "rules/scholar.yaml",
@@ -30,5 +30,3 @@ function academicModule(final, prev, ctx) {
         },
     };
 }
-
-module.exports = academicModule;

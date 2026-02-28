@@ -1,4 +1,4 @@
-// lib/lazy.js
+// src/lib/lazy.js
 // Nix-style overlay system adapted for JavaScript's eager evaluation.
 //
 // Key insight: Nix's overlay system works because of pervasive lazy evaluation.
@@ -24,11 +24,11 @@
  *   allProxies: deferred(() => [...final.proxies, 'DIRECT', 'REJECT']),
  * });
  */
-function deferred(fn) {
+export function deferred(fn) {
     return { __deferred: true, fn };
 }
 
-function isDeferred(val) {
+export function isDeferred(val) {
     return val !== null && typeof val === 'object' && val.__deferred === true;
 }
 
@@ -40,7 +40,7 @@ function isDeferred(val) {
  *
  * @param {any} value
  */
-function mkDefault(value) {
+export function mkDefault(value) {
     return { __priority: 'default', value };
 }
 
@@ -51,7 +51,7 @@ function mkDefault(value) {
  *
  * @param {any} value
  */
-function mkForce(value) {
+export function mkForce(value) {
     return { __priority: 'force', value };
 }
 
@@ -63,11 +63,11 @@ function mkForce(value) {
  *
  * @param {any} value
  */
-function mkOverride(value) {
+export function mkOverride(value) {
     return { __priority: 'override', value };
 }
 
-function isPriorityWrapped(val) {
+export function isPriorityWrapped(val) {
     return val !== null && typeof val === 'object' && typeof val.__priority === 'string';
 }
 
@@ -75,26 +75,26 @@ function isPriorityWrapped(val) {
  * Get the priority type of a value.
  * @returns {'default' | 'force' | 'override' | 'regular'}
  */
-function getPriorityType(val) {
+export function getPriorityType(val) {
     return isPriorityWrapped(val) ? val.__priority : 'regular';
 }
 
 /** Unwrap a priority wrapper, returning the raw value. */
-function unwrapPriority(val) {
+export function unwrapPriority(val) {
     return isPriorityWrapped(val) ? val.value : val;
 }
 
 // ─── Order Wrappers (list element positioning) ──────────────────────
 
-const DEFAULT_ORDER = 100;
-const BEFORE_ORDER = 0;
-const AFTER_ORDER = 10000;
+export const DEFAULT_ORDER = 100;
+export const BEFORE_ORDER = 0;
+export const AFTER_ORDER = 10000;
 
 /**
  * Place list elements at the front (order 0).
  * @param {Array} items
  */
-function mkBefore(items) {
+export function mkBefore(items) {
     return { __ordered: true, order: BEFORE_ORDER, items };
 }
 
@@ -102,7 +102,7 @@ function mkBefore(items) {
  * Place list elements at the end (order 10000).
  * @param {Array} items
  */
-function mkAfter(items) {
+export function mkAfter(items) {
     return { __ordered: true, order: AFTER_ORDER, items };
 }
 
@@ -113,22 +113,22 @@ function mkAfter(items) {
  * @param {number} order - Sort position
  * @param {Array} items - Array of items
  */
-function mkOrder(order, items) {
+export function mkOrder(order, items) {
     return { __ordered: true, order, items };
 }
 
 /** Check if a value is an order wrapper (mkBefore/mkAfter/mkOrder). */
-function isOrdered(val) {
+export function isOrdered(val) {
     return val !== null && typeof val === 'object' && val.__ordered === true;
 }
 
 /** Check if a value is accumulated ordered segments (internal). */
-function isOrderedList(val) {
+export function isOrderedList(val) {
     return val !== null && typeof val === 'object' && val.__orderedList === true;
 }
 
 /** Check if a value is array-like (plain array, ordered, or ordered list). */
-function isArrayLike(val) {
+export function isArrayLike(val) {
     return Array.isArray(val) || isOrdered(val) || isOrderedList(val);
 }
 
@@ -136,7 +136,7 @@ function isArrayLike(val) {
  * Recursively resolve all deferred values, unwrap priority wrappers,
  * and flatten ordered lists.
  */
-function resolveDeferred(obj, visited = new WeakSet()) {
+export function resolveDeferred(obj, visited = new WeakSet()) {
     if (obj === null || obj === undefined) return obj;
     if (isPriorityWrapped(obj)) {
         return resolveDeferred(obj.value, visited);
@@ -200,18 +200,8 @@ function flattenOrderedList(orderedList, visited) {
  * @param {Array<(final, prev) => object>} overlays - Overlay functions
  * @param {{ merge?: (cur, ext) => object }} [options] - Custom merge strategy
  * @returns {object} Final resolved result
- *
- * @example
- * const result = applyOverlays(
- *   { a: 1 },
- *   [
- *     (final, prev) => ({ b: prev.a + 1, c: 3 }),
- *     (final, prev) => ({ c: 10, d: deferred(() => final.c + final.b) }),
- *   ]
- * );
- * // => { a: 1, b: 2, c: 10, d: 12 }
  */
-function applyOverlays(base, overlays, options = {}) {
+export function applyOverlays(base, overlays, options = {}) {
     const merge = options.merge || shallowMerge;
 
     let finalResolved = null;
@@ -269,18 +259,10 @@ function shallowMerge(current, extension) {
     return { ...current, ...extension };
 }
 
-// ─── Smart Merge for Clash Configs ──────────────────────────────────
-
 /**
- * Merge strategy for Clash module contributions.
- *
- * Rules:
- *   - Arrays: concatenated (rules, proxy-groups)
- *   - Plain objects: shallow merged (rule-providers, dns sections)
- *   - Scalars: later value wins
- *   - Keys prefixed with `_`: internal metadata, shallow merged
+ * Merge strategy for Clash module contributions (simple version).
  */
-function clashMerge(current, extension) {
+export function clashMerge(current, extension) {
     const result = { ...current };
     for (const [key, value] of Object.entries(extension)) {
         if (!(key in result)) {
@@ -302,11 +284,7 @@ function clashMerge(current, extension) {
 
 // ─── Nix-Compatible Primitives (for reference) ─────────────────────
 
-/**
- * Nix `lib.extends`: apply an overlay to a fixed-point function.
- * Note: base and overlay must not eagerly access `final`.
- */
-function extends_(overlay, baseFunc) {
+export function extends_(overlay, baseFunc) {
     return (final) => {
         const prev = baseFunc(final);
         const ext = overlay(final, prev);
@@ -314,10 +292,7 @@ function extends_(overlay, baseFunc) {
     };
 }
 
-/**
- * Nix `lib.composeManyExtensions`: compose multiple overlays.
- */
-function composeManyExtensions(overlays) {
+export function composeManyExtensions(overlays) {
     return (final, prev) => {
         let acc = prev;
         for (const overlay of overlays) {
@@ -328,55 +303,10 @@ function composeManyExtensions(overlays) {
     };
 }
 
-// ─── Extensible Object ─────────────────────────────────────────────
-
-/**
- * Create an object that can be extended with overlays.
- * Each call to `.extend(overlay)` returns a NEW object.
- *
- * @param {object} base
- * @param {Array} [initialOverlays]
- * @returns {object & { extend: Function }}
- *
- * @example
- * let obj = makeExtensible({ a: 1 });
- * obj = obj.extend((final, prev) => ({ b: prev.a + 1 }));
- * obj = obj.extend((final, prev) => ({
- *   c: deferred(() => final.a + final.b),
- * }));
- * console.log(obj.c); // 3
- */
-function makeExtensible(base, initialOverlays = []) {
+export function makeExtensible(base, initialOverlays = []) {
     const result = applyOverlays(base, initialOverlays);
     result.extend = (overlay) => {
         return makeExtensible(base, [...initialOverlays, overlay]);
     };
     return result;
 }
-
-module.exports = {
-    deferred,
-    isDeferred,
-    resolveDeferred,
-    mkDefault,
-    mkForce,
-    mkOverride,
-    isPriorityWrapped,
-    getPriorityType,
-    unwrapPriority,
-    mkBefore,
-    mkAfter,
-    mkOrder,
-    isOrdered,
-    isOrderedList,
-    isArrayLike,
-    DEFAULT_ORDER,
-    BEFORE_ORDER,
-    AFTER_ORDER,
-    applyOverlays,
-    shallowMerge,
-    clashMerge,
-    extends_,
-    composeManyExtensions,
-    makeExtensible,
-};

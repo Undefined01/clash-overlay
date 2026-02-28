@@ -1,0 +1,18 @@
+{
+  "name": "clash-overlay",
+  "version": "1.0.0",
+  "description": "Modular Clash/Mihomo override script with Nix-style overlay system",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "test": "node tests/test-lazy.js && node tests/test-integration.js",
+    "test:lazy": "node tests/test-lazy.js",
+    "test:integration": "node tests/test-integration.js",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  },
+  "license": "MIT"
+}
