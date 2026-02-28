@@ -1,6 +1,6 @@
 // src/modules/ai.js — 国外 AI 分流
 
-import { dustinRule, rulesetRule } from '../lib/helpers.js';
+import { dustinRule, rulesetRule } from '../lib/clash.js';
 import { mkOrder } from '../lib/lazy.js';
 
 export default function aiModule(final, prev, ctx) {

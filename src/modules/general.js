@@ -1,6 +1,6 @@
 // src/modules/general.js — 通用配置：入站、控制器、TUN、Geodata、嗅探
 
-import { getGithub } from '../lib/helpers.js';
+import { getGithub } from '../lib/clash.js';
 
 export default function generalModule(final, prev, ctx) {
     const { ipv6Enabled } = ctx.args;

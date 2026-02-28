@@ -1,6 +1,6 @@
 // src/modules/dns.js — DNS 配置：服务器、fake-ip、hosts
 
-import { dustinRule } from '../lib/helpers.js';
+import { dustinRule } from '../lib/clash.js';
 
 export default function dnsModule(final, prev, ctx) {
     const { ipv6Enabled, dnsMode } = ctx.args;

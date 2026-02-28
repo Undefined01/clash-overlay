@@ -4,7 +4,7 @@ import { mkBefore } from '../lib/lazy.js';
 import {
     miniIcon, qureIcon, externalIcon,
     generalGroup, PRIMITIVE_GROUPS,
-} from '../lib/helpers.js';
+} from '../lib/clash.js';
 
 export default function baseGroupsModule(final, prev, ctx) {
     const proxies = ctx.config.proxies.map(p => p.name);

@@ -1,7 +1,7 @@
 // src/modules/landing-proxy.js — 落地代理（链式代理固定出口 IP）
 
 import { deferred, mkOrder } from '../lib/lazy.js';
-import { GROUP_COMMON, externalIcon } from '../lib/helpers.js';
+import { GROUP_COMMON, externalIcon } from '../lib/clash.js';
 
 export default function landingProxyModule(final, prev, ctx) {
     const proxies = ctx.config.proxies.map(p => p.name);

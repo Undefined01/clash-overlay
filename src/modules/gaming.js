@@ -1,6 +1,6 @@
 // src/modules/gaming.js — 游戏平台
 
-import { dustinRule, rulesetRule, trafficGroup, miniIcon } from '../lib/helpers.js';
+import { dustinRule, rulesetRule, trafficGroup, miniIcon } from '../lib/clash.js';
 import { mkOrder } from '../lib/lazy.js';
 
 export default function gamingModule(final, prev, ctx) {

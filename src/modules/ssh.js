@@ -1,7 +1,7 @@
 // src/modules/ssh.js — SSH（端口 22）代理模块
 
 import { deferred, mkOrder } from '../lib/lazy.js';
-import { GROUP_COMMON, reorderProxies, externalIcon } from '../lib/helpers.js';
+import { GROUP_COMMON, reorderProxies, externalIcon } from '../lib/clash.js';
 
 export default function sshModule(final, prev, ctx) {
     return {

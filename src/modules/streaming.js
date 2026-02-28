@@ -1,6 +1,6 @@
 // src/modules/streaming.js — 流媒体：Netflix、Disney+、YouTube、Spotify 等
 
-import { dustinRule, rulesetRule, trafficGroup, qureIcon } from '../lib/helpers.js';
+import { dustinRule, rulesetRule, trafficGroup, qureIcon } from '../lib/clash.js';
 import { mkOrder } from '../lib/lazy.js';
 
 export default function streamingModule(final, prev, ctx) {
