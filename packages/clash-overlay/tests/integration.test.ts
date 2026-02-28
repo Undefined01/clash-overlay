@@ -214,7 +214,7 @@ describe('Rule-provider conflict', () => {
         };
         expect(() =>
             mergeModules([mod1, mod2], { args: {}, config: { proxies: [] } }),
-        ).toThrow(/Rule provider key conflict: "proxy"/);
+        ).toThrow(/Unique-key conflict in "rule-providers": sub-key "proxy"/);
     });
 });
 

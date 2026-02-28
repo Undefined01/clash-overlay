@@ -13,7 +13,7 @@
 
 import { isDeferred } from './deferred.js';
 import { resolveDeferred } from './resolve.js';
-import type { OverlayFn, MergeFn, ApplyOverlaysOptions } from './types.js';
+import type { OverlayFn, ApplyOverlaysOptions } from './types.js';
 
 /**
  * Apply overlays to a base state, producing the final merged result.
