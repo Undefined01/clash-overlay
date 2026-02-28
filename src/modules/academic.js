@@ -3,7 +3,7 @@
 import {
     makeRuleProvider, dustinRule, rulesetRule,
     trafficGroup, externalIcon,
-} from '../lib/helpers.js';
+} from '../lib/clash.js';
 import { mkOrder } from '../lib/lazy.js';
 
 export default function academicModule(final, prev, ctx) {

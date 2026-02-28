@@ -1,6 +1,6 @@
 // src/modules/private.js — 私有网络 + 广告拦截
 
-import { dustinRule, rulesetRule, trafficGroup, externalIcon } from '../lib/helpers.js';
+import { dustinRule, rulesetRule, trafficGroup, externalIcon } from '../lib/clash.js';
 import { mkOrder } from '../lib/lazy.js';
 
 export default function privateModule(final, prev, ctx) {

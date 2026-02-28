@@ -1,6 +1,6 @@
 // src/modules/custom.js — 自定义规则：校园网、特殊 IP、NJU DNS
 
-import { externalIcon, trafficGroup } from '../lib/helpers.js';
+import { externalIcon, trafficGroup } from '../lib/clash.js';
 import { mkOrder } from '../lib/lazy.js';
 
 export default function customModule(final, prev, ctx) {

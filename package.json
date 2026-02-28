@@ -6,13 +6,13 @@
   "main": "src/index.js",
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "node tests/test-lazy.js && node tests/test-integration.js",
-    "test:lazy": "node tests/test-lazy.js",
-    "test:integration": "node tests/test-integration.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "clean": "rm -rf dist"
   },
   "devDependencies": {
-    "esbuild": "^0.25.0"
+    "esbuild": "^0.25.0",
+    "vitest": "^4.0.18"
   },
   "license": "MIT"
 }

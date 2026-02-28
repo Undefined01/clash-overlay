@@ -1,6 +1,6 @@
 // src/modules/proxy.js — 国外代理 + 漏网之鱼 兜底
 
-import { dustinRule, rulesetRule, trafficGroup, qureIcon } from '../lib/helpers.js';
+import { dustinRule, rulesetRule, trafficGroup, qureIcon } from '../lib/clash.js';
 import { mkOrder, mkAfter } from '../lib/lazy.js';
 
 export default function proxyModule(final, prev, ctx) {
