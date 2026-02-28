@@ -11,9 +11,20 @@ importers:
       esbuild:
         specifier: ^0.25.0
         version: 0.25.12
+      typescript:
+        specifier: ^5.8.0
+        version: 5.9.3
       vitest:
         specifier: ^4.0.18
         version: 4.0.18
+
+  packages/clash-overlay:
+    dependencies:
+      liboverlay:
+        specifier: workspace:*
+        version: link:../liboverlay
+
+  packages/liboverlay: {}
 
 packages:
 
@@ -598,6 +609,11 @@ packages:
     resolution: {integrity: sha512-PSkbLUoxOFRzJYjjxHJt9xro7D+iilgMX/C9lawzVuYiIdcihh9DXmVibBe8lmcFrRi/VzlPjBxbN7rH24q8/Q==}
     engines: {node: '>=14.0.0'}
 
+  typescript@5.9.3:
+    resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+
   vite@7.3.1:
     resolution: {integrity: sha512-w+N7Hifpc3gRjZ63vYBXA56dvvRlNWRczTdmCBBa+CotUzAPf5b7YMdMR/8CQoeYE5LX3W4wj6RYTgonm1b9DA==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -1108,6 +1124,8 @@ snapshots:
       picomatch: 4.0.3
 
   tinyrainbow@3.0.3: {}
+
+  typescript@5.9.3: {}
 
   vite@7.3.1:
     dependencies:
