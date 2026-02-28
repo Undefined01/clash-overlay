@@ -12,6 +12,8 @@ export type {
     ApplyOverlaysOptions,
 } from './types.js';
 
+export type { ModuleMergeOptions } from './module-merge.js';
+
 // Deferred values
 export { deferred, isDeferred } from './deferred.js';
 
@@ -52,3 +54,10 @@ export {
     composeManyExtensions,
     makeExtensible,
 } from './overlay.js';
+
+// Module merge (Nix module-system-style configuration merging)
+export {
+    createModuleMerge,
+    moduleMerge,
+    cleanup,
+} from './module-merge.js';
