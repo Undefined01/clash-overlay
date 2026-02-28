@@ -1,17 +1,19 @@
 {
-  "name": "clash-overlay",
+  "name": "override-workspace",
   "version": "1.0.0",
-  "description": "Modular Clash/Mihomo override script with Nix-style overlay system",
+  "private": true,
+  "description": "Monorepo: liboverlay (generic overlay library) + clash-overlay (Clash/Mihomo config)",
   "type": "module",
-  "main": "src/index.js",
   "scripts": {
-    "build": "node scripts/build.js",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "clean": "rm -rf dist"
+    "test": "pnpm -r test",
+    "test:watch": "pnpm -r --parallel test:watch",
+    "typecheck": "pnpm -r typecheck",
+    "build": "pnpm --filter clash-overlay build",
+    "clean": "pnpm -r clean"
   },
   "devDependencies": {
     "esbuild": "^0.25.0",
+    "typescript": "^5.8.0",
     "vitest": "^4.0.18"
   },
   "license": "MIT"
