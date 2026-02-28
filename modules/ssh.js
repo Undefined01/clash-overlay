@@ -7,14 +7,15 @@
 //   - 其他代理组
 
 const { deferred } = require('../lib/lazy');
+const { mkOrder } = require('../lib/lazy');
 const {
     GROUP_COMMON, PRIMITIVE_GROUPS, reorderProxies,
     externalIcon,
 } = require('../lib/helpers');
 
-module.exports = function sshModule(final, prev, ctx) {
+function sshModule(final, prev, ctx) {
     return {
-        proxyGroups: [
+        'proxy-groups': mkOrder(15, [
             {
                 ...GROUP_COMMON,
                 name: "SSH 代理",
@@ -24,11 +25,13 @@ module.exports = function sshModule(final, prev, ctx) {
                 ),
                 icon: externalIcon("fSPmETYJKmmk"),
             },
-        ],
+        ]),
 
         // DST-PORT,22 匹配所有 SSH 流量
-        rules: [
+        rules: mkOrder(15, [
             "DST-PORT,22,SSH 代理",
-        ],
+        ]),
     };
-};
+}
+
+module.exports = sshModule;

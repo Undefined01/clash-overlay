@@ -3,7 +3,7 @@
 
 const { dustinRule } = require('../lib/helpers');
 
-module.exports = function dnsModule(final, prev, ctx) {
+function dnsModule(final, prev, ctx) {
     const { ipv6Enabled, dnsMode } = ctx.args;
 
     if (dnsMode !== "fake-ip" && dnsMode !== "redir-host") {
@@ -67,6 +67,8 @@ module.exports = function dnsModule(final, prev, ctx) {
         },
 
         // 仅注册 fakeip-filter 规则集（不生成 RULE-SET 规则）
-        ruleProviders: { [fakeipFilter.name]: fakeipFilter.provider },
+        'rule-providers': { [fakeipFilter.name]: fakeipFilter.provider },
     };
-};
+}
+
+module.exports = dnsModule;

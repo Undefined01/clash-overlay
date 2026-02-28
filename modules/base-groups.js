@@ -2,13 +2,14 @@
 // 这些组被流量组引用为可选代理，不直接关联分流规则。
 
 const { deferred } = require('../lib/lazy');
+const { mkBefore } = require('../lib/lazy');
 const {
     getGithub, miniIcon, qureIcon, externalIcon,
     generalGroup, PRIMITIVE_GROUPS,
 } = require('../lib/helpers');
 
-module.exports = function baseGroupsModule(final, prev, ctx) {
-    const { proxies } = ctx;
+function baseGroupsModule(final, prev, ctx) {
+    const proxies = ctx.config.proxies.map(p => p.name);
 
     const generalGroupNames = ["手动选择", "延迟测试", "负载均衡"];
 
@@ -17,7 +18,7 @@ module.exports = function baseGroupsModule(final, prev, ctx) {
         _proxies: proxies,
         _allSelectables: [...generalGroupNames, ...proxies, ...PRIMITIVE_GROUPS],
 
-        proxyGroups: [
+        'proxy-groups': mkBefore([
             generalGroup(final, {
                 name: "手动选择",
                 proxies: ["延迟测试", "负载均衡", ...proxies, ...PRIMITIVE_GROUPS],
@@ -46,6 +47,8 @@ module.exports = function baseGroupsModule(final, prev, ctx) {
                     "(?i)香港|HK|Hong Kong|台湾|TW|Tai Wan|官网|TG|节点|到期|流量|返利|订阅",
                 icon: externalIcon("Nts60kQIvGqe"),
             }),
-        ],
+        ]),
     };
-};
+}
+
+module.exports = baseGroupsModule;

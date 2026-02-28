@@ -1,8 +1,9 @@
 // modules/streaming.js — 流媒体：Netflix、Disney+、YouTube、Spotify 等
 
 const { dustinRule, rulesetRule, trafficGroup, qureIcon } = require('../lib/helpers');
+const { mkOrder } = require('../lib/lazy');
 
-module.exports = function streamingModule(final, prev, ctx) {
+function streamingModule(final, prev, ctx) {
     const domainSets = [
         "netflix", "disney", "max", "primevideo", "appletv",
         "youtube", "tiktok", "spotify", "media",
@@ -12,21 +13,22 @@ module.exports = function streamingModule(final, prev, ctx) {
     const mediaIp   = dustinRule("mediaip");
 
     return {
-        proxyGroups: [
-            trafficGroup(final, "流媒体", { defaultProxy: "手动选择", icon: "Netflix" }),
-        ],
+        'proxy-groups': mkOrder(50, [
+            trafficGroup(final, "流媒体", { defaultProxy: "手动选择", icon: qureIcon("Netflix") }),
+        ]),
 
-        rules: domainSets.map(r => rulesetRule(r.name, "流媒体")),
-
-        ipRules: [
+        rules: mkOrder(50, [
+            ...domainSets.map(r => rulesetRule(r.name, "流媒体")),
             rulesetRule(netflixIp.name, "流媒体", "no-resolve"),
             rulesetRule(mediaIp.name,   "流媒体", "no-resolve"),
-        ],
+        ]),
 
-        ruleProviders: {
+        'rule-providers': {
             ...Object.fromEntries(domainSets.map(r => [r.name, r.provider])),
             [netflixIp.name]: netflixIp.provider,
             [mediaIp.name]:   mediaIp.provider,
         },
     };
-};
+}
+
+module.exports = streamingModule;
