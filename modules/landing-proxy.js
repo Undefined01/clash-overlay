@@ -15,18 +15,19 @@
 // 需要用户自行添加落地代理节点（以 "落地" 或 "Landing" 开头的节点名）。
 
 const { deferred } = require('../lib/lazy');
+const { mkOrder } = require('../lib/lazy');
 const {
     GROUP_COMMON, reorderProxies, externalIcon,
 } = require('../lib/helpers');
 
-module.exports = function landingProxyModule(final, prev, ctx) {
-    const { proxies } = ctx;
+function landingProxyModule(final, prev, ctx) {
+    const proxies = ctx.config.proxies.map(p => p.name);
 
     // 落地代理节点通过名称过滤
     const LANDING_FILTER = "(?i)落地|Landing|固定|Residential";
 
     return {
-        proxyGroups: [
+        'proxy-groups': mkOrder(3, [
             // ── 落地代理（链式中继）──
             // 匹配落地节点，通过 "手动选择" 中继出去
             {
@@ -52,6 +53,8 @@ module.exports = function landingProxyModule(final, prev, ctx) {
                 ]),
                 icon: externalIcon("ABvCfQAJ"),
             },
-        ],
+        ]),
     };
-};
+}
+
+module.exports = landingProxyModule;

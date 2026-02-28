@@ -3,44 +3,42 @@
 
 const { getGithub } = require('../lib/helpers');
 
-module.exports = function generalModule(final, prev, ctx) {
+function generalModule(final, prev, ctx) {
     const { ipv6Enabled } = ctx.args;
 
     return {
-        general: {
-            // ── 入站 ──
-            "mixed-port": 7890,
-            "allow-lan": true,
-            "bind-address": "*",
+        // ── 入站 ──
+        "mixed-port": 7890,
+        "allow-lan": true,
+        "bind-address": "*",
 
-            // ── 外部控制 ──
-            "external-controller": "[::]:9093",
-            secret: "8db22dfa-c425-42ca-8d1d-5e1a62e232ef",
+        // ── 外部控制 ──
+        "external-controller": "[::]:9093",
+        secret: "8db22dfa-c425-42ca-8d1d-5e1a62e232ef",
 
-            // ── UI (yacd) ──
-            "external-ui": "ui",
-            "external-ui-name": "yacd",
-            "external-ui-url":
-                "https://github.com/haishanh/yacd/archive/refs/heads/gh-pages.zip",
+        // ── UI (yacd) ──
+        "external-ui": "ui",
+        "external-ui-name": "yacd",
+        "external-ui-url":
+            "https://github.com/haishanh/yacd/archive/refs/heads/gh-pages.zip",
 
-            // ── 核心 ──
-            mode: "rule",
-            ipv6: ipv6Enabled,
-            "unified-delay": true,
-            "tcp-concurrent": true,
-            "find-process-mode": "strict",
-            "global-client-fingerprint": "chrome",
-            profile: { "store-selected": true, "store-fake-ip": true },
+        // ── 核心 ──
+        mode: "rule",
+        ipv6: ipv6Enabled,
+        "unified-delay": true,
+        "tcp-concurrent": true,
+        "find-process-mode": "strict",
+        "global-client-fingerprint": "chrome",
+        profile: { "store-selected": true, "store-fake-ip": true },
 
-            // ── Geodata ──
-            "geo-auto-update": true,
-            "geo-update-interval": 24,
-            "geox-url": {
-                geoip:   getGithub("DustinWin", "ruleset_geodata", "mihomo-geodata", "geoip.dat"),
-                geosite: getGithub("DustinWin", "ruleset_geodata", "mihomo-geodata", "geosite.dat"),
-                mmdb:    getGithub("DustinWin", "ruleset_geodata", "mihomo-geodata", "Country.mmdb"),
-                asn:     getGithub("DustinWin", "ruleset_geodata", "mihomo-geodata", "GeoLite2-ASN.mmdb"),
-            },
+        // ── Geodata ──
+        "geo-auto-update": true,
+        "geo-update-interval": 24,
+        "geox-url": {
+            geoip:   getGithub("DustinWin", "ruleset_geodata", "mihomo-geodata", "geoip.dat"),
+            geosite: getGithub("DustinWin", "ruleset_geodata", "mihomo-geodata", "geosite.dat"),
+            mmdb:    getGithub("DustinWin", "ruleset_geodata", "mihomo-geodata", "Country.mmdb"),
+            asn:     getGithub("DustinWin", "ruleset_geodata", "mihomo-geodata", "GeoLite2-ASN.mmdb"),
         },
 
         tun: { enable: true, stack: "mixed" },
@@ -65,5 +63,7 @@ module.exports = function generalModule(final, prev, ctx) {
             ],
         },
     };
-};
+}
+
+module.exports = generalModule;
 

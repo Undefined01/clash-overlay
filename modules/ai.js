@@ -3,17 +3,20 @@
 // 流量指向 "落地切换" 组，可在 落地代理/国外 AI 直出 间切换。
 
 const { dustinRule, rulesetRule } = require('../lib/helpers');
+const { mkOrder } = require('../lib/lazy');
 
-module.exports = function aiModule(final, prev, ctx) {
+function aiModule(final, prev, ctx) {
     const ai = dustinRule("ai");
 
     return {
-        rules: [
+        rules: mkOrder(60, [
             rulesetRule(ai.name, "落地切换"),
-        ],
+        ]),
 
-        ruleProviders: {
+        'rule-providers': {
             [ai.name]: ai.provider,
         },
     };
-};
+}
+
+module.exports = aiModule;

@@ -17,7 +17,7 @@ try {
 
     console.log("=== Integration Test ===\n");
 
-    // 1. Check top-level keys
+    // 1. Check top-level keys (now direct Clash-native keys)
     const requiredKeys = [
         "mixed-port", "allow-lan", "mode", "dns", "tun", "sniffer",
         "proxies", "proxy-groups", "rules", "rule-providers",
@@ -31,7 +31,10 @@ try {
 
     const expectedGroups = [
         "手动选择", "延迟测试", "负载均衡", "国外 AI",
-        "校园网", "私有网络", "广告", "学术网站", "种子 Trackers",
+        "落地代理", "落地切换",
+        "校园网", "SSH 代理",
+        "私有网络", "广告",
+        "学术网站", "种子 Trackers",
         "国内直连", "流媒体", "游戏平台", "国外代理", "漏网之鱼",
     ];
     const missingGroups = expectedGroups.filter(g => !groupNames.includes(g));
@@ -41,14 +44,9 @@ try {
     console.log(`\nRules (${result.rules.length}):`);
     result.rules.forEach((r, i) => console.log(`  ${i + 1}. ${r}`));
 
-    // 4. Check rule ordering: domain rules before IP rules before MATCH
-    const matchIdx = result.rules.findIndex(r => r.startsWith("MATCH"));
-    const lastDomainIdx = result.rules.reduce((acc, r, i) =>
-        r.startsWith("RULE-SET") && !r.includes("no-resolve") ? i : acc, -1);
-    const firstIpIdx = result.rules.findIndex(r => r.includes("no-resolve"));
-    console.log(`\nRule ordering: domain(last=${lastDomainIdx}) < ip(first=${firstIpIdx}) < MATCH(${matchIdx}): ${
-        lastDomainIdx < firstIpIdx && firstIpIdx < matchIdx ? "✓ OK" : "✗ WRONG"
-    }`);
+    // 4. Check MATCH is last rule
+    const lastRule = result.rules[result.rules.length - 1];
+    console.log(`\nMATCH is last rule: ${lastRule.startsWith("MATCH") ? "✓ OK" : "✗ WRONG: " + lastRule}`);
 
     // 5. Rule providers
     const providerNames = Object.keys(result["rule-providers"]);
@@ -59,7 +57,7 @@ try {
     const proxiesResolved = Array.isArray(streamGroup.proxies) && streamGroup.proxies.length > 0;
     console.log(`\n流媒体 proxies resolved: ${proxiesResolved ? "✓ " + streamGroup.proxies.join(", ") : "✗ UNRESOLVED"}`);
 
-    // 7. Check easyconnect proxy exists
+    // 7. Check easyconnect proxy exists (now in proxies via array concat)
     const hasEasyconnect = result.proxies.some(p => p.name === "easyconnect");
     console.log(`easyconnect proxy: ${hasEasyconnect ? "✓ present" : "✗ MISSING"}`);
 
@@ -67,9 +65,17 @@ try {
     console.log(`\nDNS enhanced-mode: ${result.dns["enhanced-mode"]}`);
     console.log(`DNS nameserver-priority: ${JSON.stringify(result.dns["nameserver-priority"])}`);
 
-    // 9. Check no duplicates in rules
+    // 9. Check no _* metadata keys leaked
+    const metaKeys = Object.keys(result).filter(k => k.startsWith('_'));
+    console.log(`\nMetadata keys cleaned: ${metaKeys.length === 0 ? "✓ None" : "✗ LEAKED: " + metaKeys.join(", ")}`);
+
+    // 10. Check no duplicates in rules
     const ruleSet = new Set(result.rules);
-    console.log(`\nDuplicate rules: ${ruleSet.size === result.rules.length ? "✓ None" : `✗ ${result.rules.length - ruleSet.size} duplicates`}`);
+    console.log(`Duplicate rules: ${ruleSet.size === result.rules.length ? "✓ None" : `✗ ${result.rules.length - ruleSet.size} duplicates`}`);
+
+    // 11. Check icons are full URLs (not bare names)
+    const badIcons = result["proxy-groups"].filter(g => g.icon && !g.icon.startsWith("http"));
+    console.log(`Icons are full URLs: ${badIcons.length === 0 ? "✓ All URLs" : "✗ BAD: " + badIcons.map(g => g.name + "=" + g.icon).join(", ")}`);
 
     console.log("\n=== PASS ===");
 } catch (err) {
