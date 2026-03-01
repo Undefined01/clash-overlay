@@ -24,7 +24,7 @@ importers:
         specifier: ^4.0.18
         version: 4.0.18(yaml@2.8.2)
 
-  packages/clash-overlay:
+  packages/substore-overlay:
     dependencies:
       liboverlay:
         specifier: workspace:*

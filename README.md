@@ -8,7 +8,7 @@
 override/
 ├── packages/
 │   ├── liboverlay/        # 通用 overlay 库
-│   └── clash-overlay/     # Clash/Mihomo 覆写脚本
+│   └── substore-overlay/     # Clash/Mihomo 覆写脚本
 ├── docs/
 │   └── api/               # 自动生成的 API 参考（typedoc）
 ├── pnpm-workspace.yaml
@@ -28,11 +28,11 @@ override/
 
 → 详细文档：[packages/liboverlay/README.md](packages/liboverlay/README.md)
 
-### [clash-overlay](packages/clash-overlay/README.md)
+### [substore-overlay](packages/substore-overlay/README.md)
 
 基于 liboverlay 的 Clash/Mihomo 覆写脚本。将 Clash 配置拆分为独立模块（DNS、代理组、分流规则等），每个模块贡献一个配置片段，由框架合并为最终的完整配置。
 
-→ 详细文档：[packages/clash-overlay/README.md](packages/clash-overlay/README.md)
+→ 详细文档：[packages/substore-overlay/README.md](packages/substore-overlay/README.md)
 
 ## 快速开始
 
@@ -63,10 +63,10 @@ pnpm typecheck     # TypeScript 类型检查
 ### 构建
 
 ```bash
-pnpm build         # 构建 clash-overlay → dist/override.js
+pnpm build         # 构建 substore-overlay → dist/override.js
 ```
 
-构建产物 `packages/clash-overlay/dist/override.js` 是一个自包含的 IIFE 脚本，可直接用于 Clash/Mihomo 的覆写功能。
+构建产物 `packages/substore-overlay/dist/override.js` 是一个自包含的 IIFE 脚本，可直接用于 Clash/Mihomo 的覆写功能。
 
 ### 生成 API 文档
 
