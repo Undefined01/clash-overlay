@@ -1,5 +1,5 @@
 {
-  "name": "liboverlay",
+  "name": "libmodule",
   "version": "1.0.0",
   "description": "Nix-style overlay system for JavaScript/TypeScript",
   "type": "module",

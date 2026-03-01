@@ -1,12 +1,13 @@
 // tests/integration.test.ts — Full override pipeline integration tests
 import { describe, it, expect } from 'vitest';
-import { parseArgs, mergeList } from '../src/lib/helpers.js';
-import { mergeModules, cleanup } from '../src/lib/merge.js';
+import { mergeList } from '../src/lib/helpers.js';
+import { mergeModules, cleanup, buildModuleContext } from '../src/lib/merge.js';
+import { getSubstoreContext } from '../src/lib/substore-context.js';
 import {
-    deferred, mkBefore, mkAfter, mkOrder, mkDefault, mkForce,
-} from 'liboverlay';
+    mkBefore, mkAfter, mkOrder, mkDefault, mkForce,
+} from 'libmodule';
 import {
-    GROUP_COMMON, PRIMITIVE_GROUPS,
+    PRIMITIVE_GROUPS,
     trafficGroup, generalGroup, rulesetRule, dustinRule,
     miniIcon, qureIcon,
 } from '../src/lib/clash.js';
@@ -14,27 +15,27 @@ import {
 // ─── Minimal fixture modules ────────────────────────────────────────
 
 function fixture_general(
-    _final: Record<string, unknown>,
-    _prev: Record<string, unknown>,
-    ctx: { args: Record<string, unknown> },
+    config: Record<string, unknown>,
 ): Record<string, unknown> {
+    const ctx = getSubstoreContext(config);
+    const ipv6 = ctx.arguments.get('ipv6Enabled') === 'true';
     return {
         mode: 'rule',
-        ipv6: ctx.args.ipv6Enabled as boolean,
+        ipv6,
     };
 }
 
 function fixture_baseGroups(
-    final: Record<string, unknown>,
-    _prev: Record<string, unknown>,
-    ctx: { config: { proxies: Array<{ name: string }> } },
+    config: Record<string, unknown>,
 ): Record<string, unknown> {
-    const proxies = ctx.config.proxies.map(p => p.name);
+    const proxies = (config.proxies as Array<{ name?: unknown }>)
+        .map(p => String(p.name || ''))
+        .filter(Boolean);
     return {
         _proxies: proxies,
         _allSelectables: ['手动选择', ...proxies, ...PRIMITIVE_GROUPS],
         'proxy-groups': mkBefore([
-            generalGroup(final, {
+            generalGroup(config, {
                 name: '手动选择',
                 proxies: [...proxies, ...PRIMITIVE_GROUPS],
                 icon: miniIcon('Static'),
@@ -44,13 +45,12 @@ function fixture_baseGroups(
 }
 
 function fixture_traffic(
-    final: Record<string, unknown>,
-    _prev: Record<string, unknown>,
+    config: Record<string, unknown>,
 ): Record<string, unknown> {
     const { name: rpName, provider: rp } = dustinRule('ai');
     return {
         'proxy-groups': mkOrder(900, [
-            trafficGroup(final, 'AI', {
+            trafficGroup(config, 'AI', {
                 defaultProxy: '手动选择',
                 icon: qureIcon('Bot'),
             }),
@@ -74,6 +74,21 @@ function fixture_domestic(): Record<string, unknown> {
     };
 }
 
+async function runModules(
+    modules: Array<(config: Record<string, unknown>) => Record<string, unknown>>,
+    config: { proxies: Array<{ name: string; [key: string]: unknown }> },
+    rawArgs: Record<string, unknown> = {},
+): Promise<Record<string, unknown>> {
+    const argumentsMap = new Map<string, string>(
+        Object.entries(rawArgs).map(([k, v]) => [k, String(v)]),
+    );
+    return cleanup(await mergeModules(
+        modules,
+        config,
+        buildModuleContext({ arguments: argumentsMap, rawArguments: rawArgs }),
+    ));
+}
+
 // ─── Full pipeline ──────────────────────────────────────────────────
 
 describe('Full override pipeline', () => {
@@ -84,8 +99,6 @@ describe('Full override pipeline', () => {
             { name: 'JP-1', server: '9.0.1.2' },
         ],
     };
-    const args = parseArgs({});
-    const ctx = { args, config };
 
     const modules = [
         fixture_general,
@@ -97,8 +110,8 @@ describe('Full override pipeline', () => {
 
     let result: Record<string, unknown>;
 
-    it('merges without error', () => {
-        result = cleanup(mergeModules(modules, ctx));
+    it('merges without error', async () => {
+        result = await runModules(modules, config);
         expect(result).toBeDefined();
     });
 
@@ -168,23 +181,17 @@ describe('Full override pipeline', () => {
 // ─── Priority integration ───────────────────────────────────────────
 
 describe('Priority in full pipeline', () => {
-    it('mkDefault overridden by bare value', () => {
+    it('mkDefault overridden by bare value', async () => {
         const mod1 = () => ({ port: mkDefault(7890) });
         const mod2 = () => ({ port: 1080 });
-        const result = cleanup(mergeModules([mod1, mod2], {
-            args: parseArgs({}),
-            config: { proxies: [] },
-        }));
+        const result = await runModules([mod1, mod2], { proxies: [] });
         expect(result.port).toBe(1080);
     });
 
-    it('mkForce wins over bare value', () => {
+    it('mkForce wins over bare value', async () => {
         const mod1 = () => ({ port: 7890 });
         const mod2 = () => ({ port: mkForce(1080) });
-        const result = cleanup(mergeModules([mod1, mod2], {
-            args: parseArgs({}),
-            config: { proxies: [] },
-        }));
+        const result = await runModules([mod1, mod2], { proxies: [] });
         expect(result.port).toBe(1080);
     });
 });
@@ -192,10 +199,12 @@ describe('Priority in full pipeline', () => {
 // ─── Argument propagation ───────────────────────────────────────────
 
 describe('Argument propagation', () => {
-    it('ipv6Enabled=true flows through', () => {
-        const args = parseArgs({ ipv6Enabled: 'true' });
-        const ctx = { args, config: { proxies: [] as Array<{ name: string }> } };
-        const result = cleanup(mergeModules([fixture_general], ctx));
+    it('ipv6Enabled=true flows through', async () => {
+        const result = await runModules(
+            [fixture_general],
+            { proxies: [] as Array<{ name: string }> },
+            { ipv6Enabled: 'true' },
+        );
         expect(result.ipv6).toBe(true);
     });
 });
@@ -203,7 +212,7 @@ describe('Argument propagation', () => {
 // ─── Rule-provider conflict detection ───────────────────────────────
 
 describe('Rule-provider conflict', () => {
-    it('throws when two modules define same rule-provider key', () => {
+    it('throws when two modules define same rule-provider key', async () => {
         const mod1 = () => {
             const { name, provider } = dustinRule('proxy');
             return { 'rule-providers': { [name]: provider } };
@@ -212,9 +221,9 @@ describe('Rule-provider conflict', () => {
             const { name, provider } = dustinRule('proxy');
             return { 'rule-providers': { [name]: provider } };
         };
-        expect(() =>
-            mergeModules([mod1, mod2], { args: parseArgs({}), config: { proxies: [] } }),
-        ).toThrow(/Unique-key conflict in "rule-providers": sub-key "proxy"/);
+        await expect(runModules([mod1, mod2], { proxies: [] }))
+            .rejects
+            .toThrow(/Unique-key conflict in "rule-providers": sub-key "proxy"/);
     });
 });
 

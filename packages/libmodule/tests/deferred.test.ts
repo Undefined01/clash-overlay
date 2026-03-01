@@ -27,6 +27,7 @@ describe('deferred', () => {
 describe('isDeferred', () => {
     it('recognizes deferred values', () => {
         expect(isDeferred(deferred(() => 1))).toBe(true);
+        expect(isDeferred(deferred(async () => 1))).toBe(true);
     });
 
     it('returns false for non-deferred values', () => {
@@ -38,6 +39,8 @@ describe('isDeferred', () => {
         expect(isDeferred([])).toBe(false);
         expect(isDeferred({ __deferred: false })).toBe(false);
         expect(isDeferred({ __deferred: 'true' })).toBe(false);
+        expect(isDeferred({ a: deferred(() => 1 )})).toBe(false);
+        expect(isDeferred([ deferred(() => 1) ])).toBe(false);
     });
 
     it('requires __deferred === true (not truthy)', () => {

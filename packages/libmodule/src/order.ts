@@ -1,4 +1,4 @@
-// liboverlay/src/order.ts
+// libmodule/src/order.ts
 // Nix-compatible ordering system for list element positioning.
 //
 // In Nix:

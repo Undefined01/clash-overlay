@@ -1,4 +1,4 @@
-// liboverlay/src/overlay.ts
+// libmodule/src/overlay.ts
 // Core overlay application — the JS equivalent of Nix's overlay system.
 //
 // Key insight: Nix's overlay system works because of pervasive lazy evaluation.
@@ -12,8 +12,8 @@
 //   - `final`: the state after ALL overlays are applied (lazy, use in deferred/getters)
 
 import { isDeferred } from './deferred.js';
-import { resolveDeferred } from './resolve.js';
-import type { OverlayFn, ApplyOverlaysOptions } from './types.js';
+import { resolveDeferred, resolveDeferredAsync } from './resolve.js';
+import type { OverlayFn, AsyncOverlayFn, ApplyOverlaysOptions } from './types.js';
 
 /**
  * Apply overlays to a base state, producing the final merged result.
@@ -85,6 +85,64 @@ export function applyOverlays(
     finalResolved = current;
     const resolved = resolveDeferred(current) as Record<string, unknown>;
     finalResolved = resolved; // update for any nested deferred that reference final
+
+    return resolved;
+}
+
+/**
+ * Async overlay application. Supports:
+ * - overlay functions that return Promise
+ * - deferred resolvers that return Promise
+ */
+export async function applyOverlaysAsync(
+    base: Record<string, unknown>,
+    overlays: AsyncOverlayFn[],
+    options: ApplyOverlaysOptions = {},
+): Promise<Record<string, unknown>> {
+    const merge = options.merge ?? shallowMerge;
+
+    let finalResolved: Record<string, unknown> | null = null;
+    const finalProxy = new Proxy(Object.create(null) as Record<string, unknown>, {
+        get(_: Record<string, unknown>, prop: string | symbol): unknown {
+            if (prop === '__isFinalProxy') return true;
+            if (finalResolved === null) {
+                throw new Error(
+                    `Cannot eagerly access final.${String(prop)} during overlay evaluation. ` +
+                    `Wrap in deferred(() => final.${String(prop)}).`,
+                );
+            }
+            return finalResolved[prop as string];
+        },
+        has(_: Record<string, unknown>, prop: string | symbol): boolean {
+            if (finalResolved === null) {
+                throw new Error(`Cannot check 'final' membership during overlay evaluation.`);
+            }
+            return (prop as string) in finalResolved;
+        },
+        ownKeys(): Array<string | symbol> {
+            if (finalResolved === null) {
+                throw new Error(`Cannot enumerate 'final' during overlay evaluation.`);
+            }
+            return Reflect.ownKeys(finalResolved);
+        },
+        getOwnPropertyDescriptor(_: Record<string, unknown>, prop: string | symbol): PropertyDescriptor | undefined {
+            if (finalResolved === null) return undefined;
+            if ((prop as string) in finalResolved) {
+                return { value: finalResolved[prop as string], writable: true, enumerable: true, configurable: true };
+            }
+            return undefined;
+        },
+    });
+
+    let current: Record<string, unknown> = { ...base };
+    for (const overlay of overlays) {
+        const ext = await overlay(finalProxy, current);
+        current = merge(current, ext);
+    }
+
+    finalResolved = current;
+    const resolved = await resolveDeferredAsync(current) as Record<string, unknown>;
+    finalResolved = resolved;
 
     return resolved;
 }

@@ -1,4 +1,4 @@
-// liboverlay/src/types.ts
+// libmodule/src/types.ts
 // Core type definitions for the Nix-style overlay system.
 
 // ─── Deferred ───────────────────────────────────────────────────────
@@ -6,7 +6,7 @@
 /** Deferred value — resolved after all overlays merge. */
 export interface Deferred<T = unknown> {
     readonly __deferred: true;
-    readonly fn: () => T;
+    readonly fn: () => T | Promise<T>;
 }
 
 // ─── Priority (Nix-compatible) ──────────────────────────────────────
@@ -56,6 +56,12 @@ export type OverlayFn = (
     final: Record<string, unknown>,
     prev: Record<string, unknown>,
 ) => Record<string, unknown>;
+
+/** Async overlay function: may resolve extension asynchronously. */
+export type AsyncOverlayFn = (
+    final: Record<string, unknown>,
+    prev: Record<string, unknown>,
+) => Record<string, unknown> | Promise<Record<string, unknown>>;
 
 /** Options for applyOverlays. */
 export interface ApplyOverlaysOptions {

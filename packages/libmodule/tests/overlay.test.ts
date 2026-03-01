@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import {
     deferred,
     mkDefault, mkForce,
-    applyOverlays, simpleMerge, makeExtensible,
+    applyOverlays, applyOverlaysAsync, simpleMerge, makeExtensible,
 } from '../src/index.js';
 import type { MergeFn, OverlayFn } from '../src/index.js';
 
@@ -147,6 +147,31 @@ describe('applyOverlays', () => {
             );
             expect(result.items).toEqual([1, 2, 3]);
         });
+    });
+});
+
+describe('applyOverlaysAsync', () => {
+    it('supports async overlay functions', async () => {
+        const result = await applyOverlaysAsync(
+            { a: 1 },
+            [
+                async (_final, prev) => ({ b: (prev.a as number) + 1 }),
+                async (_final, prev) => ({ c: (prev.b as number) + 10 }),
+            ],
+        );
+        expect(result).toEqual({ a: 1, b: 2, c: 12 });
+    });
+
+    it('supports deferred that resolves asynchronously', async () => {
+        const result = await applyOverlaysAsync(
+            { base: 40 },
+            [
+                (final) => ({
+                    answer: deferred(async () => (final.base as number) + 2),
+                }),
+            ],
+        );
+        expect(result.answer).toBe(42);
     });
 });
 

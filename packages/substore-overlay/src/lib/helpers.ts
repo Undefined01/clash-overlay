@@ -26,52 +26,6 @@ export function parseString(defaultValue: string): (value: unknown) => string {
     };
 }
 
-export interface ParsedArgs {
-    /**
-     * Whether to enable IPv6 in generated mihomo config.
-     *
-     * Source: `$arguments.ipv6Enabled`.
-     *
-     * URL example:
-     * `...?ipv6Enabled=true`
-     *
-     * Runtime raw value example:
-     * `$arguments.ipv6Enabled === 'true'`
-     */
-    ipv6Enabled: boolean;
-    /**
-     * DNS mode for generated config.
-     *
-     * Source: `$arguments.dnsMode`.
-     *
-     * URL example:
-     * `...?dnsMode=redir-host`
-     *
-     * Runtime raw value example:
-     * `$arguments.dnsMode === 'redir-host'`
-     */
-    dnsMode: string;
-}
-
-/**
- * Parse user-provided script arguments to strongly-typed config values.
- *
- * Unknown fields are ignored.
- * Missing values fall back to defaults:
- * - `ipv6Enabled: false`
- * - `dnsMode: 'fake-ip'`
- */
-export function parseArgs(args: Record<string, unknown>): ParsedArgs {
-    const spec: Record<string, (val: unknown) => unknown> = {
-        ipv6Enabled: parseBool,
-        dnsMode: parseString('fake-ip'),
-    };
-    return Object.entries(spec).reduce((acc, [name, parseFunc]) => {
-        (acc as Record<string, unknown>)[name] = parseFunc(args[name]);
-        return acc;
-    }, {} as ParsedArgs);
-}
-
 // ─── Utility ────────────────────────────────────────────────────────
 
 /**

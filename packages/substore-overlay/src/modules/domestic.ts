@@ -4,11 +4,10 @@ import {
     makeRuleProvider, dustinRule, rulesetRule,
     trafficGroup, miniIcon,
 } from '../lib/clash.js';
-import { mkOrder } from 'liboverlay';
+import { mkOrder } from 'libmodule';
 
 export default function domesticModule(
-    final: Record<string, unknown>,
-    _prev: Record<string, unknown>,
+    config: Record<string, unknown>,
 ): Record<string, unknown> {
     const cn = dustinRule('cn');
     const cnIp = dustinRule('cnip');
@@ -21,7 +20,7 @@ export default function domesticModule(
 
     return {
         'proxy-groups': mkOrder(800, [
-            trafficGroup(final, '国内直连', { defaultProxy: 'DIRECT', icon: miniIcon('China') }),
+            trafficGroup(config, '国内直连', { defaultProxy: 'DIRECT', icon: miniIcon('China') }),
         ]),
 
         rules: mkOrder(800, [

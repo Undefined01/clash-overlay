@@ -1,18 +1,17 @@
 // substore-overlay/src/modules/base-groups.ts — 基础代理组
 
-import { mkBefore } from 'liboverlay';
+import { mkBefore } from 'libmodule';
 import {
     miniIcon, qureIcon, externalIcon,
     generalGroup, PRIMITIVE_GROUPS,
 } from '../lib/clash.js';
-import type { ModuleContext } from '../lib/merge.js';
 
 export default function baseGroupsModule(
-    final: Record<string, unknown>,
-    _prev: Record<string, unknown>,
-    ctx: ModuleContext,
+    config: Record<string, unknown>,
 ): Record<string, unknown> {
-    const proxies = ctx.config.proxies.map(p => p.name);
+    const proxies = (config.proxies as Array<{ name?: unknown }> || [])
+        .map(p => String(p.name || ''))
+        .filter(Boolean);
 
     const generalGroupNames = ['手动选择', '延迟测试', '负载均衡'];
 
@@ -21,25 +20,25 @@ export default function baseGroupsModule(
         _allSelectables: [...generalGroupNames, ...proxies, ...PRIMITIVE_GROUPS],
 
         'proxy-groups': mkBefore([
-            generalGroup(final, {
+            generalGroup(config, {
                 name: '手动选择',
                 proxies: ['延迟测试', '负载均衡', ...proxies, ...PRIMITIVE_GROUPS],
                 icon: miniIcon('Static'),
             }),
-            generalGroup(final, {
+            generalGroup(config, {
                 name: '延迟测试',
                 type: 'url-test',
                 proxies,
                 icon: qureIcon('Auto'),
             }),
-            generalGroup(final, {
+            generalGroup(config, {
                 name: '负载均衡',
                 type: 'load-balance',
                 strategy: 'sticky-sessions',
                 proxies,
                 icon: qureIcon('Round_Robin'),
             }),
-            generalGroup(final, {
+            generalGroup(config, {
                 name: '国外 AI',
                 type: 'url-test',
                 proxies,

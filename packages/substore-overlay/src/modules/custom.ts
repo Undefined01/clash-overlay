@@ -1,13 +1,10 @@
 // substore-overlay/src/modules/custom.ts — 自定义规则
 
 import { externalIcon, trafficGroup } from '../lib/clash.js';
-import { mkOrder } from 'liboverlay';
-import type { ModuleContext } from '../lib/merge.js';
+import { mkOrder } from 'libmodule';
 
 export default function customModule(
-    final: Record<string, unknown>,
-    _prev: Record<string, unknown>,
-    _ctx: ModuleContext,
+    config: Record<string, unknown>,
 ): Record<string, unknown> {
     return {
         proxies: [
@@ -15,7 +12,7 @@ export default function customModule(
         ],
 
         'proxy-groups': mkOrder(650, [
-            trafficGroup(final, '校园网', {
+            trafficGroup(config, '校园网', {
                 defaultProxy: 'easyconnect',
                 icon: externalIcon('4XCV6mm0hqu3'),
             }),

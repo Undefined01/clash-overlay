@@ -4,11 +4,10 @@ import {
     makeRuleProvider, dustinRule, rulesetRule,
     trafficGroup, externalIcon,
 } from '../lib/clash.js';
-import { mkOrder } from 'liboverlay';
+import { mkOrder } from 'libmodule';
 
 export default function academicModule(
-    final: Record<string, unknown>,
-    _prev: Record<string, unknown>,
+    config: Record<string, unknown>,
 ): Record<string, unknown> {
     const scholar = makeRuleProvider(
         'nerdneilsfield', 'clash_rules_for_scholar', 'master',
@@ -18,8 +17,8 @@ export default function academicModule(
 
     return {
         'proxy-groups': mkOrder(750, [
-            trafficGroup(final, '学术网站', { defaultProxy: 'DIRECT', icon: externalIcon('114326') }),
-            trafficGroup(final, '种子 Trackers', { defaultProxy: '手动选择', icon: externalIcon('tdQvZGPZFFuW') }),
+            trafficGroup(config, '学术网站', { defaultProxy: 'DIRECT', icon: externalIcon('114326') }),
+            trafficGroup(config, '种子 Trackers', { defaultProxy: '手动选择', icon: externalIcon('tdQvZGPZFFuW') }),
         ]),
 
         rules: mkOrder(750, [

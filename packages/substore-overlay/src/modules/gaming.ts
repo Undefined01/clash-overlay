@@ -1,18 +1,17 @@
 // substore-overlay/src/modules/gaming.ts — 游戏平台
 
 import { dustinRule, rulesetRule, trafficGroup, miniIcon } from '../lib/clash.js';
-import { mkOrder } from 'liboverlay';
+import { mkOrder } from 'libmodule';
 
 export default function gamingModule(
-    final: Record<string, unknown>,
-    _prev: Record<string, unknown>,
+    config: Record<string, unknown>,
 ): Record<string, unknown> {
     const games = dustinRule('games');
     const gamesIp = dustinRule('gamesip');
 
     return {
         'proxy-groups': mkOrder(875, [
-            trafficGroup(final, '游戏平台', { defaultProxy: '手动选择', icon: miniIcon('Steam') }),
+            trafficGroup(config, '游戏平台', { defaultProxy: '手动选择', icon: miniIcon('Steam') }),
         ]),
 
         rules: mkOrder(875, [

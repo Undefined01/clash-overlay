@@ -1,4 +1,4 @@
-// liboverlay/src/priority.ts
+// libmodule/src/priority.ts
 // Nix-compatible priority system for scalar conflict resolution.
 //
 // In Nix:

@@ -6,7 +6,7 @@ import {
     GROUP_COMMON, PRIMITIVE_GROUPS,
     reorderProxies, trafficGroup, generalGroup,
 } from '../src/lib/clash.js';
-import { isDeferred, resolveDeferred } from 'liboverlay';
+import { isDeferred, resolveDeferred } from 'libmodule';
 
 // ─── URL / Icon Helpers ─────────────────────────────────────────────
 

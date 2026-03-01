@@ -1,18 +1,22 @@
 // tests/merge.test.ts — Tests for Clash-specific merge behavior
 //
-// Generic moduleMerge tests live in liboverlay/tests/module-merge.test.ts.
+// Generic moduleMerge tests live in libmodule/tests/module-merge.test.ts.
 // This file only tests Clash-specific configuration:
 //   - rule-providers unique-key conflict detection
-//   - mergeModules with ModuleContext injection
+//   - mergeModules with _ctx initial injection
 //   - cleanup delegation
 import { describe, it, expect } from 'vitest';
 import {
-    deferred, mkDefault, mkForce, mkOverride,
+    mkDefault,
     mkBefore, mkAfter, mkOrder,
     applyOverlays,
-} from 'liboverlay';
-import { clashModuleMerge, mergeModules, cleanup } from '../src/lib/merge.js';
-import { parseArgs } from '../src/lib/helpers.js';
+} from 'libmodule';
+import {
+    clashModuleMerge,
+    mergeModules,
+    cleanup,
+    buildModuleContext,
+} from '../src/lib/merge.js';
 
 // Helper: apply overlays with clashModuleMerge
 function mergeWith(...overlays: Array<Record<string, unknown>>): Record<string, unknown> {
@@ -61,31 +65,37 @@ describe('clashModuleMerge — rule-providers', () => {
 // ─── mergeModules ───────────────────────────────────────────────────
 
 describe('mergeModules', () => {
-    it('merges modules with ctx injection', () => {
-        const mod1 = (
-            _final: Record<string, unknown>,
-            _prev: Record<string, unknown>,
-            ctx: { config: { proxies: Array<{ name: string }> } },
-        ) => ({
+    it('merges modules and exposes _ctx via config', async () => {
+        const mod1 = () => ({
             mode: 'rule',
-            'proxy-groups': mkBefore([{ name: 'select', proxies: ctx.config.proxies.map(p => p.name) }]),
+            'proxy-groups': mkBefore([{ name: 'select', proxies: ['HK', 'US'] }]),
         });
-        const mod2 = () => ({
+        const mod2 = (config: Record<string, unknown>) => ({
             rules: mkOrder(800, ['MATCH,DIRECT']),
+            marker: (config._ctx as { arguments: Map<string, string> }).arguments.get('k'),
         });
 
-        const result = mergeModules([mod1, mod2], {
-            args: parseArgs({}),
-            config: { proxies: [{ name: 'HK' }, { name: 'US' }] },
-        });
+        const result = await mergeModules(
+            [mod1, mod2],
+            { proxies: [{ name: 'HK' }, { name: 'US' }] },
+            buildModuleContext({
+                arguments: new Map([['k', 'v']]),
+                rawArguments: { k: 'v' },
+            }),
+        );
 
         expect(result.mode).toBe('rule');
         expect((result['proxy-groups'] as Array<{ proxies: string[] }>)[0].proxies).toEqual(['HK', 'US']);
         expect(result.rules).toEqual(['MATCH,DIRECT']);
+        expect(result.marker).toBe('v');
     });
 
-    it('handles empty modules list', () => {
-        const result = mergeModules([], { args: parseArgs({}), config: { proxies: [] } });
+    it('handles empty modules list', async () => {
+        const result = await mergeModules(
+            [],
+            { proxies: [] },
+            buildModuleContext({ arguments: new Map(), rawArguments: {} }),
+        );
         expect(result.proxies).toEqual([]);
         expect(result.rules).toEqual([]);
     });

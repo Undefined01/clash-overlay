@@ -26,11 +26,11 @@ importers:
 
   packages/substore-overlay:
     dependencies:
-      liboverlay:
+      libmodule:
         specifier: workspace:*
-        version: link:../liboverlay
+        version: link:../libmodule
 
-  packages/liboverlay: {}
+  packages/libmodule: {}
 
 packages:
 

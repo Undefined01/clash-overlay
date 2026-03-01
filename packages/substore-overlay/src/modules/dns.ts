@@ -1,14 +1,14 @@
 // substore-overlay/src/modules/dns.ts — DNS 配置
 
 import { dustinRule } from '../lib/clash.js';
-import type { ModuleContext } from '../lib/merge.js';
+import { getBooleanArg, getSubstoreContext } from '../lib/substore-context.js';
 
 export default function dnsModule(
-    _final: Record<string, unknown>,
-    _prev: Record<string, unknown>,
-    ctx: ModuleContext,
+    config: Record<string, unknown>,
 ): Record<string, unknown> {
-    const { ipv6Enabled, dnsMode } = ctx.args;
+    const ctx = getSubstoreContext(config);
+    const ipv6Enabled = getBooleanArg(ctx, 'ipv6Enabled', false);
+    const dnsMode = ctx.arguments.get('dnsMode') || 'fake-ip';
 
     if (dnsMode !== 'fake-ip' && dnsMode !== 'redir-host') {
         throw new Error('Invalid dnsMode: ' + dnsMode);

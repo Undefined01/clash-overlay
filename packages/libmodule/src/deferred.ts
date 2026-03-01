@@ -1,4 +1,4 @@
-// liboverlay/src/deferred.ts
+// libmodule/src/deferred.ts
 // Deferred values — resolved after all overlays merge.
 
 import type { Deferred } from './types.js';
@@ -12,7 +12,7 @@ import type { Deferred } from './types.js';
  *   allProxies: deferred(() => [...final.proxies, 'DIRECT', 'REJECT']),
  * });
  */
-export function deferred<T>(fn: () => T): Deferred<T> {
+export function deferred<T>(fn: () => T | Promise<T>): Deferred<T> {
     return { __deferred: true, fn };
 }
 

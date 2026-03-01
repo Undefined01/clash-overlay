@@ -1,11 +1,10 @@
 // substore-overlay/src/modules/proxy.ts — 国外代理 + 漏网之鱼 兜底
 
 import { dustinRule, rulesetRule, trafficGroup, qureIcon } from '../lib/clash.js';
-import { mkOrder, mkAfter } from 'liboverlay';
+import { mkOrder, mkAfter } from 'libmodule';
 
 export default function proxyModule(
-    final: Record<string, unknown>,
-    _prev: Record<string, unknown>,
+    config: Record<string, unknown>,
 ): Record<string, unknown> {
     const proxy = dustinRule('proxy');
     const networktest = dustinRule('networktest');
@@ -14,8 +13,8 @@ export default function proxyModule(
 
     return {
         'proxy-groups': mkOrder(1100, [
-            trafficGroup(final, '国外代理', { defaultProxy: '手动选择', icon: qureIcon('Global') }),
-            trafficGroup(final, '漏网之鱼', { defaultProxy: '手动选择', icon: qureIcon('Final') }),
+            trafficGroup(config, '国外代理', { defaultProxy: '手动选择', icon: qureIcon('Global') }),
+            trafficGroup(config, '漏网之鱼', { defaultProxy: '手动选择', icon: qureIcon('Final') }),
         ]),
 
         rules: [

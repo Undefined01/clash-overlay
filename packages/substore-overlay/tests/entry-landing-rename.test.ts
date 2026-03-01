@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { renameProxiesByEntryLanding } from '../src/modules/rename-by-entry-landing.js';
+import { renameProxiesByEntryLanding } from '../src/entrypoints/02_rename_by_entry_landing.js';
 
 describe('renameProxiesByEntryLanding', () => {
     it('sorts by landing/multiplier and applies per-landing numbering', () => {
@@ -33,9 +33,9 @@ describe('renameProxiesByEntryLanding', () => {
             showResidential: true,
         });
 
+        expect(proxies[0].name).toBe('SG 01 1x | SubC');
         expect(proxies[1].name).toBe('JP->US 01 1x 家宽 | SubB');
-        expect(proxies[0].name).toBe('HK->US 02 2x | SubA');
-        expect(proxies[2].name).toBe('SG 01 1x | SubC');
+        expect(proxies[2].name).toBe('HK->US 02 2x | SubA');
     });
 
     it('supports disabling residential tag and default multiplier fallback', () => {

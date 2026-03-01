@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     deferred, mkDefault, mkForce, mkOverride, mkOrder,
-    resolveDeferred,
+    resolveDeferred, resolveDeferredAsync,
 } from '../src/index.js';
 
 describe('resolveDeferred', () => {
@@ -10,6 +10,11 @@ describe('resolveDeferred', () => {
 
     it('resolves deferred values', () => {
         expect(resolveDeferred(deferred(() => 42))).toBe(42);
+    });
+
+    it('throws in sync mode when deferred returns Promise', () => {
+        expect(() => resolveDeferred(deferred(async () => 42)))
+            .toThrow(/Use resolveDeferredAsync/);
     });
 
     it('resolves nested deferred values', () => {
@@ -129,5 +134,19 @@ describe('resolveDeferred', () => {
         expect((result.a as Record<string, unknown>).x).toBe(42);
         // b gets the original ref (visited) — this is the current behavior
         expect(result.b).toBe(shared);
+    });
+});
+
+describe('resolveDeferredAsync', () => {
+    it('resolves async deferred values', async () => {
+        await expect(resolveDeferredAsync(deferred(async () => 42))).resolves.toBe(42);
+    });
+
+    it('resolves nested async deferred values', async () => {
+        const obj = {
+            a: deferred(async () => 1),
+            b: { c: deferred(async () => 2) },
+        };
+        await expect(resolveDeferredAsync(obj)).resolves.toEqual({ a: 1, b: { c: 2 } });
     });
 });

@@ -5,8 +5,5 @@
     "outDir": "dist"
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts"],
-  "exclude": ["tests", "dist", "scripts"],
-  "references": [
-    { "path": "../liboverlay" }
-  ]
+  "exclude": ["tests", "dist", "scripts"]
 }

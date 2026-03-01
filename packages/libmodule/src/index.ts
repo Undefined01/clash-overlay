@@ -1,4 +1,4 @@
-// liboverlay/src/index.ts
+// libmodule/src/index.ts
 // Public API — re-exports all overlay primitives.
 
 // Types
@@ -9,6 +9,7 @@ export type {
     OrderedList,
     MergeFn,
     OverlayFn,
+    AsyncOverlayFn,
     ApplyOverlaysOptions,
 } from './types.js';
 
@@ -44,11 +45,12 @@ export {
 } from './order.js';
 
 // Resolution
-export { resolveDeferred } from './resolve.js';
+export { resolveDeferred, resolveDeferredAsync } from './resolve.js';
 
 // Overlay application
 export {
     applyOverlays,
+    applyOverlaysAsync,
     simpleMerge,
     extends_,
     composeManyExtensions,
@@ -61,3 +63,15 @@ export {
     moduleMerge,
     cleanup,
 } from './module-merge.js';
+
+// High-level processors
+export {
+    REMOVE,
+    applyOverlay,
+    mergeModule,
+} from './processors.js';
+export type {
+    ModuleFn,
+    ApplyOverlayOptions,
+    MergeModuleOptions,
+} from './processors.js';

@@ -1,6 +1,6 @@
 // tests/helpers.test.ts — Tests for helpers
 import { describe, it, expect } from 'vitest';
-import { parseBool, parseNumber, parseString, parseArgs, mergeList } from '../src/lib/helpers.js';
+import { parseBool, parseNumber, parseString, mergeList } from '../src/lib/helpers.js';
 
 // ─── parseBool ──────────────────────────────────────────────────────
 
@@ -84,30 +84,6 @@ describe('parseString', () => {
         expect(parser('hello')).toBe('hello');
         expect(parser(42)).toBe('42');
         expect(parser(true)).toBe('true');
-    });
-});
-
-// ─── parseArgs ──────────────────────────────────────────────────────
-
-describe('parseArgs', () => {
-    it('returns defaults for empty args', () => {
-        const result = parseArgs({});
-        expect(result.ipv6Enabled).toBe(false);
-        expect(result.dnsMode).toBe('fake-ip');
-    });
-
-    it('parses ipv6Enabled', () => {
-        expect(parseArgs({ ipv6Enabled: 'true' }).ipv6Enabled).toBe(true);
-        expect(parseArgs({ ipv6Enabled: true }).ipv6Enabled).toBe(true);
-    });
-
-    it('parses dnsMode', () => {
-        expect(parseArgs({ dnsMode: 'redir-host' }).dnsMode).toBe('redir-host');
-    });
-
-    it('ignores unknown args', () => {
-        const result = parseArgs({ unknownKey: 'whatever' });
-        expect(result).not.toHaveProperty('unknownKey');
     });
 });
 

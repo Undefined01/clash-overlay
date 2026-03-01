@@ -1,4 +1,4 @@
-# liboverlay
+# libmodule
 
 通用的配置合成库（overlay system），适用于任何需要"多个模块各自贡献配置片段，最终合并为一份完整配置"的场景。
 
@@ -11,6 +11,9 @@ API 参考文档可通过 `pnpm docs` 自动生成至 `docs/api/`。
 - [核心概念](#核心概念)
 - [安装](#安装)
 - [快速上手](#快速上手)
+- [高阶处理器](#高阶处理器)
+  - [ApplyOverlay](#applyoverlay)
+  - [MergeModule](#mergemodule)
 - [Overlay 系统](#overlay-系统)
   - [基本用法](#基本用法)
   - [prev 与 final](#prev-与-final)
@@ -52,7 +55,7 @@ API 参考文档可通过 `pnpm docs` 自动生成至 `docs/api/`。
 }
 ```
 
-这就是 liboverlay 解决的问题。它提供了一套声明式的配置合成机制：
+这就是 libmodule 解决的问题。它提供了一套声明式的配置合成机制：
 
 - **数组自动拼接**，并且可以控制元素顺序
 - **对象自动深合并**
@@ -65,11 +68,11 @@ API 参考文档可通过 `pnpm docs` 自动生成至 `docs/api/`。
 
 ```bash
 # 作为 workspace 依赖
-pnpm add liboverlay
+pnpm add libmodule
 
 # 或在 package.json 中（monorepo 内）
 "dependencies": {
-  "liboverlay": "workspace:*"
+  "libmodule": "workspace:*"
 }
 ```
 
@@ -78,7 +81,7 @@ pnpm add liboverlay
 ## 快速上手
 
 ```ts
-import { applyOverlays, moduleMerge, mkBefore, mkAfter } from 'liboverlay';
+import { applyOverlays, moduleMerge, mkBefore, mkAfter } from 'libmodule';
 
 // 定义三个 overlay（配置片段）
 const base = () => ({
@@ -108,6 +111,54 @@ console.log(config);
 
 ---
 
+## 高阶处理器
+
+### ApplyOverlay
+
+`applyOverlay(base, overlays)` 是面向 attrset 的 overlay 处理器，语义接近 nixpkgs overlay：
+
+- overlay 形如 `(final, prev) => attrs`
+- 可以新增/覆盖 key（顶层浅替换，不做对象深合并）
+- 可以用 `REMOVE` 或 `null` 删除 key
+
+```ts
+import { applyOverlay, REMOVE } from 'libmodule';
+
+const result = await applyOverlay(
+  { a: { b: { c: 1 } }, b: { x: 2 } },
+  [
+    () => ({ a: { d: 2 } }),
+    () => ({ b: REMOVE }),
+  ],
+);
+// { a: { d: 2 } }
+```
+
+### MergeModule
+
+`mergeModule(base, modules)` 是面向配置模块的处理器，模块签名是：
+
+```ts
+type Module = (config: Record<string, unknown>) => Record<string, unknown> | Promise<Record<string, unknown>>;
+```
+
+模块只接收最终配置 `config`，适用于 NixOS module 风格：
+
+```ts
+import { mergeModule, mkDefault, mkForce } from 'libmodule';
+
+const config = await mergeModule(
+  {},
+  [
+    () => ({ port: mkDefault(7890) }),
+    () => ({ port: mkForce(443) }),
+  ],
+);
+// { port: 443 }
+```
+
+---
+
 ## Overlay 系统
 
 ### 基本用法
@@ -119,7 +170,7 @@ console.log(config);
 - `options.merge`：合并策略（推荐使用 `moduleMerge`）
 
 ```ts
-import { applyOverlays, simpleMerge } from 'liboverlay';
+import { applyOverlays, simpleMerge } from 'libmodule';
 
 const result = applyOverlays(
   { name: 'app' },
@@ -164,7 +215,7 @@ const bad = (final, prev) => ({
 `deferred(fn)` 创建一个"延迟值"——它的求值被推迟到所有 overlay 合并完毕之后：
 
 ```ts
-import { deferred, applyOverlays, moduleMerge } from 'liboverlay';
+import { deferred, applyOverlays, moduleMerge } from 'libmodule';
 
 const result = applyOverlays(
   {},
@@ -204,12 +255,12 @@ const modB = (final) => ({
 
 当两个模块对同一个标量字段赋了不同的值时，直接合并会产生歧义。"后者覆盖前者"是一种策略，但它的问题是：**合并结果依赖于模块注册顺序**，而模块的作者通常不知道（也不应该关心）自己被注册在第几位。
 
-liboverlay 的做法是：**同优先级、不同值 = 报错**。如果你确实需要覆盖，必须显式声明优先级。
+libmodule 的做法是：**同优先级、不同值 = 报错**。如果你确实需要覆盖，必须显式声明优先级。
 
 ### mkDefault / mkForce / mkOverride
 
 ```ts
-import { mkDefault, mkForce, mkOverride } from 'liboverlay';
+import { mkDefault, mkForce, mkOverride } from 'libmodule';
 
 // mkDefault(value) — 声明一个"默认值"（优先级 1000，最容易被覆盖）
 const mod1 = () => ({ port: mkDefault(8080) });
@@ -245,7 +296,7 @@ const mod4 = () => ({ port: mkOverride(25, 9999) });
 | 不同优先级 | 数字更小的一方胜出 |
 
 ```ts
-import { applyOverlays, moduleMerge, mkDefault, mkForce } from 'liboverlay';
+import { applyOverlays, moduleMerge, mkDefault, mkForce } from 'libmodule';
 
 // ✅ 同一个值，没有冲突
 applyOverlays({}, [
@@ -283,7 +334,7 @@ applyOverlays({}, [
 对于数组类型的字段，你可以控制元素的排列顺序，而不必关心模块的注册顺序：
 
 ```ts
-import { mkBefore, mkAfter, mkOrder } from 'liboverlay';
+import { mkBefore, mkAfter, mkOrder } from 'libmodule';
 
 const modA = () => ({
   rules: mkAfter(['MATCH,PROXY']),        // 放最后（排序值 1500）
@@ -345,7 +396,7 @@ MATCH,PROXY       (1500 — mkAfter)
 如果默认行为不完全满足需求，可以用 `createModuleMerge(options)` 创建自定义的合并函数：
 
 ```ts
-import { createModuleMerge, applyOverlays } from 'liboverlay';
+import { createModuleMerge, applyOverlays } from 'libmodule';
 
 const myMerge = createModuleMerge({
   // 这些 key 下的子 key 不允许重复（重复即报错）
@@ -370,7 +421,7 @@ const result = applyOverlays({}, overlays, { merge: myMerge });
 合并后通常需要清理元数据和空值：
 
 ```ts
-import { cleanup } from 'liboverlay';
+import { cleanup } from 'libmodule';
 
 const merged = applyOverlays(base, overlays, { merge: moduleMerge });
 const final = cleanup(merged);
@@ -388,7 +439,7 @@ const final = cleanup(merged);
 一个简单的合并策略：数组拼接、对象浅合并、标量后者覆盖。不做优先级检测，不做排序。适合快速原型。
 
 ```ts
-import { applyOverlays, simpleMerge } from 'liboverlay';
+import { applyOverlays, simpleMerge } from 'libmodule';
 const result = applyOverlays({}, overlays, { merge: simpleMerge });
 ```
 
@@ -397,7 +448,7 @@ const result = applyOverlays({}, overlays, { merge: simpleMerge });
 让一个对象变得可"扩展"——返回一个带 `.extend()` 方法的对象：
 
 ```ts
-import { makeExtensible } from 'liboverlay';
+import { makeExtensible } from 'libmodule';
 
 const base = makeExtensible({ port: 8080 });
 const extended = base.extend((final, prev) => ({

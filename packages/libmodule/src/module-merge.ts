@@ -1,4 +1,4 @@
-// liboverlay/src/module-merge.ts
+// libmodule/src/module-merge.ts
 // Configurable module merge strategy — the JS equivalent of NixOS module
 // configuration merging.
 //

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildGeoPairCacheId } from '../src/modules/entry-landing-geo.js';
+import { buildGeoPairCacheId } from '../src/entrypoints/01_detect_entry_landing_geo.js';
 
 describe('buildGeoPairCacheId', () => {
     it('ignores volatile fields like name/id/_*', () => {

@@ -2,7 +2,7 @@
   "name": "override-workspace",
   "version": "1.0.0",
   "private": true,
-  "description": "Monorepo: liboverlay (generic overlay library) + substore-overlay (Clash/Mihomo config)",
+  "description": "Monorepo: libmodule (generic overlay library) + substore-overlay (Clash/Mihomo config)",
   "type": "module",
   "scripts": {
     "test": "pnpm -r test",

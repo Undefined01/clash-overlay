@@ -1,11 +1,10 @@
 // substore-overlay/src/modules/streaming.ts — 流媒体
 
 import { dustinRule, rulesetRule, trafficGroup, qureIcon } from '../lib/clash.js';
-import { mkOrder } from 'liboverlay';
+import { mkOrder } from 'libmodule';
 
 export default function streamingModule(
-    final: Record<string, unknown>,
-    _prev: Record<string, unknown>,
+    config: Record<string, unknown>,
 ): Record<string, unknown> {
     const domainSets = [
         'netflix', 'disney', 'max', 'primevideo', 'appletv',
@@ -17,7 +16,7 @@ export default function streamingModule(
 
     return {
         'proxy-groups': mkOrder(850, [
-            trafficGroup(final, '流媒体', { defaultProxy: '手动选择', icon: qureIcon('Netflix') }),
+            trafficGroup(config, '流媒体', { defaultProxy: '手动选择', icon: qureIcon('Netflix') }),
         ]),
 
         rules: mkOrder(850, [

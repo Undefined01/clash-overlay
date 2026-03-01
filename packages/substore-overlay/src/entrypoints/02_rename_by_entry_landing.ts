@@ -1,8 +1,17 @@
-import type {
-    MutableProxy,
-    ProxyPreprocessContext,
-    ProxyPreprocessor,
-} from '../lib/proxy-preprocess.js';
+import type { ScriptOperator, SubStoreArguments } from '../types/substore.js';
+
+interface RenameProxy extends Record<string, unknown> {
+    name?: string;
+    _originName?: string;
+    _subDisplayName?: string;
+    _geoEntry?: {
+        countryCode?: string;
+    };
+    _geoLanding?: {
+        countryCode?: string;
+        isResidential?: boolean;
+    };
+}
 
 export interface RenameArgs {
     enabled: boolean;
@@ -10,32 +19,19 @@ export interface RenameArgs {
     showResidential: boolean;
 }
 
-const DEFAULT_RENAME_ARGS: RenameArgs = {
-    enabled: true,
-    defaultMultiplier: 1,
-    showResidential: true,
-};
+const operator: ScriptOperator<RenameProxy> = (proxies, _targetPlatform, _context) => {
+    if (!Array.isArray(proxies) || proxies.length === 0) return proxies;
 
-export default function renameByEntryLandingModule(
-    proxies: MutableProxy[],
-    ctx: ProxyPreprocessContext,
-): void {
-    const args = parseRenameArgs(ctx.rawArgs);
-    if (!args.enabled || proxies.length === 0) return;
-    renameProxiesByEntryLanding(proxies, args);
-}
+    const args = parseRenameArgs(typeof $arguments !== 'undefined' ? $arguments : {});
+    if (!args.enabled) return proxies;
 
-export function renameProxiesByEntryLanding(
-    proxies: MutableProxy[],
-    args: RenameArgs,
-): void {
     const rows = proxies.map(proxy => {
         const originName = String(proxy._originName || proxy.name || '');
         const entryCode = normalizeCode(getDeep(proxy, '_geoEntry.countryCode'));
         const landingCode = normalizeCode(getDeep(proxy, '_geoLanding.countryCode'));
         const multiplier = extractMultiplier(originName, args.defaultMultiplier);
         const source = String(proxy._subDisplayName || '');
-        const isResidential = Boolean(getDeep(proxy, '_geoLanding.isResidential'));
+        const isResidential = !!getDeep(proxy, '_geoLanding.isResidential');
 
         return {
             proxy,
@@ -70,26 +66,82 @@ export function renameProxiesByEntryLanding(
         const left = [routePrefix, number, multiplier, ...tags].join(' ').trim();
         row.proxy.name = row.source ? `${left} | ${row.source}` : left;
     }
+
+    return proxies;
+};
+
+export default operator;
+
+export function renameProxiesByEntryLanding(
+    proxies: RenameProxy[],
+    args: RenameArgs,
+): RenameProxy[] {
+    const rows = proxies.map(proxy => {
+        const originName = String(proxy._originName || proxy.name || '');
+        const entryCode = normalizeCode(getDeep(proxy, '_geoEntry.countryCode'));
+        const landingCode = normalizeCode(getDeep(proxy, '_geoLanding.countryCode'));
+        const multiplier = extractMultiplier(originName, args.defaultMultiplier);
+        const source = String(proxy._subDisplayName || '');
+        const isResidential = !!getDeep(proxy, '_geoLanding.isResidential');
+
+        return {
+            proxy,
+            originName,
+            entryCode,
+            landingCode,
+            multiplier,
+            source,
+            isResidential,
+        };
+    });
+
+    rows.sort((a, b) => {
+        if (a.landingCode !== b.landingCode) return a.landingCode.localeCompare(b.landingCode);
+        if (a.multiplier !== b.multiplier) return a.multiplier - b.multiplier;
+        if (a.entryCode !== b.entryCode) return a.entryCode.localeCompare(b.entryCode);
+        return a.originName.localeCompare(b.originName);
+    });
+
+    const counter = new Map<string, number>();
+    const reordered: RenameProxy[] = [];
+    for (const row of rows) {
+        const next = (counter.get(row.landingCode) || 0) + 1;
+        counter.set(row.landingCode, next);
+
+        const routePrefix = row.entryCode === row.landingCode
+            ? row.landingCode
+            : `${row.entryCode}->${row.landingCode}`;
+        const number = String(next).padStart(2, '0');
+        const multiplier = formatMultiplier(row.multiplier);
+        const tags = args.showResidential && row.isResidential ? ['家宽'] : [];
+
+        const left = [routePrefix, number, multiplier, ...tags].join(' ').trim();
+        row.proxy.name = row.source ? `${left} | ${row.source}` : left;
+        reordered.push(row.proxy);
+    }
+
+    proxies.splice(0, proxies.length, ...reordered);
+    return proxies;
 }
 
-function parseRenameArgs(rawArgs: Record<string, unknown>): RenameArgs {
+function parseRenameArgs(rawArgs: SubStoreArguments): RenameArgs {
     return {
         enabled: asBoolean(
             pickArg(rawArgs, ['entry_landing_rename_enabled', 'rename_by_geo_enabled']),
-            DEFAULT_RENAME_ARGS.enabled,
+            true,
         ),
         defaultMultiplier: asPositiveFloat(
             pickArg(rawArgs, ['entry_landing_default_multiplier', 'default_multiplier']),
-            DEFAULT_RENAME_ARGS.defaultMultiplier,
+            1,
         ),
         showResidential: asBoolean(
             pickArg(rawArgs, ['entry_landing_show_residential', 'show_residential']),
-            DEFAULT_RENAME_ARGS.showResidential,
+            true,
         ),
     };
 }
 
-function pickArg(rawArgs: Record<string, unknown>, keys: string[]): unknown {
+function pickArg(rawArgs: SubStoreArguments, keys: string[]): unknown {
     for (const key of keys) {
         if (typeof rawArgs[key] !== 'undefined') return rawArgs[key];
     }
@@ -112,6 +164,7 @@ function asPositiveFloat(value: unknown, fallback: number): number {
 }
 
 function extractMultiplier(name: string, defaultValue: number): number {
+    const source = String(name || '');
     const patterns = [
         /(\d+(?:\.\d+)?)\s*x\b/i,
         /x\s*(\d+(?:\.\d+)?)/i,
@@ -119,7 +172,7 @@ function extractMultiplier(name: string, defaultValue: number): number {
         /(\d+(?:\.\d+)?)\s*倍(?:率)?/i,
     ];
     for (const pattern of patterns) {
-        const match = name.match(pattern);
+        const match = source.match(pattern);
         if (match && match[1]) {
             const parsed = Number.parseFloat(match[1]);
             if (Number.isFinite(parsed) && parsed > 0) return parsed;
@@ -134,8 +187,13 @@ function formatMultiplier(value: number): string {
     return `${rounded}x`;
 }
 
+function normalizeCode(value: unknown): string {
+    const code = String(value || '').trim().toUpperCase();
+    return code || 'ZZ';
+}
+
 function getDeep(object: Record<string, unknown>, path: string): unknown {
-    const keys = path.split('.');
+    const keys = String(path).split('.');
     let current: unknown = object;
     for (const key of keys) {
         if (!current || typeof current !== 'object' || Array.isArray(current)) return undefined;
@@ -143,10 +201,3 @@ function getDeep(object: Record<string, unknown>, path: string): unknown {
     }
     return current;
 }
-
-function normalizeCode(value: unknown): string {
-    const code = String(value || '').trim().toUpperCase();
-    return code || 'ZZ';
-}
-
-export const renameByEntryLandingPreprocessor: ProxyPreprocessor = renameByEntryLandingModule;

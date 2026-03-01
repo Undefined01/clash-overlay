@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Modular Clash/Mihomo override script with Nix-style overlay system",
   "type": "module",
-  "main": "src/index.ts",
+  "main": "src/entrypoints/index.ts",
   "scripts": {
     "build": "node scripts/build.js",
     "test": "vitest run",
@@ -12,7 +12,7 @@
     "docs": "typedoc"
   },
   "dependencies": {
-    "liboverlay": "workspace:*"
+    "libmodule": "workspace:*"
   },
   "license": "MIT"
 }

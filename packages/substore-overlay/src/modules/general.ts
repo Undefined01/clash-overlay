@@ -1,14 +1,13 @@
 // substore-overlay/src/modules/general.ts — 通用配置
 
 import { getGithub } from '../lib/clash.js';
-import type { ModuleContext } from '../lib/merge.js';
+import { getBooleanArg, getSubstoreContext } from '../lib/substore-context.js';
 
 export default function generalModule(
-    _final: Record<string, unknown>,
-    _prev: Record<string, unknown>,
-    ctx: ModuleContext,
+    config: Record<string, unknown>,
 ): Record<string, unknown> {
-    const { ipv6Enabled } = ctx.args;
+    const ctx = getSubstoreContext(config);
+    const ipv6Enabled = getBooleanArg(ctx, 'ipv6Enabled', false);
 
     return {
         'mixed-port': 7890,

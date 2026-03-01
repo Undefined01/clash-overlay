@@ -1,19 +1,24 @@
 // substore-overlay/src/lib/merge.ts
 // Clash configuration module system.
 //
-// Delegates all generic merge logic to liboverlay's `createModuleMerge`.
+// Delegates all generic merge logic to libmodule's `createModuleMerge`.
 // This file only provides:
 //   - Clash-specific merge configuration (uniqueKeyFields for rule-providers)
-//   - ModuleContext / ClashModule types
-//   - mergeModules: wires up modules with ctx injection
-//   - cleanup: re-exported from liboverlay
+//   - Substore module context and initial state builder
+//   - mergeModules: async overlay merge entry
+//   - cleanup: re-exported from libmodule
 
 import {
-    applyOverlays, createModuleMerge, cleanup as genericCleanup,
-} from 'liboverlay';
-import type { MergeFn } from 'liboverlay';
-import type { ParsedArgs } from './helpers.js';
-import type { SubStoreScriptContext } from '../types/substore.js';
+    createModuleMerge, cleanup as genericCleanup, mergeModule as genericMergeModule,
+} from 'libmodule';
+import type { MergeFn, ModuleFn } from 'libmodule';
+import type {
+    SubStoreArguments,
+    SubStoreRequestOptions,
+    SubStoreRuntimeEnv,
+    SubStoreScriptContext,
+} from '../types/substore.js';
+import type { SubstoreModuleContext } from './substore-context.js';
 
 // ─── Clash-Specific Merge ───────────────────────────────────────────
 
@@ -27,48 +32,57 @@ export const clashModuleMerge: MergeFn = createModuleMerge({
 
 // ─── Module System ──────────────────────────────────────────────────
 
-export interface ModuleContext {
-    args: ParsedArgs;
-    config: {
-        proxies: Array<{ name: string; [key: string]: unknown }>;
-        [key: string]: unknown;
-    };
-    /**
-     * Optional Sub-Store metadata context for scripts that need source/env info.
-     * Kept optional because this package can still run in plain Clash runtime.
-     */
-    scriptContext?: SubStoreScriptContext;
+export interface ClashConfigInput {
+    proxies: Array<{ name: string; [key: string]: unknown }>;
+    [key: string]: unknown;
 }
 
-export type ClashModule = (
-    final: Record<string, unknown>,
-    prev: Record<string, unknown>,
-    ctx: ModuleContext,
-) => Record<string, unknown>;
+export type ClashModule = ModuleFn;
+
+export interface BuildModuleContextOptions {
+    arguments: Map<string, string>;
+    rawArguments: SubStoreArguments;
+    options?: SubStoreRequestOptions;
+    scriptContext?: SubStoreScriptContext;
+    runtimeEnv?: SubStoreRuntimeEnv;
+}
+
+export function buildModuleContext(options: BuildModuleContextOptions): SubstoreModuleContext {
+    return {
+        arguments: options.arguments,
+        rawArguments: options.rawArguments,
+        options: options.options,
+        scriptContext: options.scriptContext,
+        runtime: { env: options.runtimeEnv },
+    };
+}
 
 /**
  * Initial empty state for the Clash module system.
  */
-function initialModuleState(config: ModuleContext['config']): Record<string, unknown> {
+function initialModuleState(
+    config: ClashConfigInput,
+    substoreContext: SubstoreModuleContext,
+): Record<string, unknown> {
     return {
         proxies: config.proxies || [],
         'proxy-groups': [],
         rules: [],
         'rule-providers': {},
+        _ctx: substoreContext,
     };
 }
 
 /**
  * Merge modules into a Clash configuration.
  */
-export function mergeModules(modules: ClashModule[], ctx: ModuleContext): Record<string, unknown> {
-    const overlays = modules.map(mod => {
-        return (final: Record<string, unknown>, prev: Record<string, unknown>) =>
-            mod(final, prev, ctx);
-    });
-
-    const base = initialModuleState(ctx.config);
-    return applyOverlays(base, overlays, { merge: clashModuleMerge });
+export async function mergeModules(
+    modules: ClashModule[],
+    config: ClashConfigInput,
+    substoreContext: SubstoreModuleContext,
+): Promise<Record<string, unknown>> {
+    const base = initialModuleState(config, substoreContext);
+    return genericMergeModule(base, modules, { merge: clashModuleMerge });
 }
 
 /**
