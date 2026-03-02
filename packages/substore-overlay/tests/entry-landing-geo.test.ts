@@ -1,11 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { buildGeoPairCacheId } from '../src/entrypoints/01_detect_entry_landing_geo.js';
+import { buildGeoPairCacheId } from '../src/entrypoints/detect_geo.js';
 
 describe('buildGeoPairCacheId', () => {
-    it('ignores volatile fields like name/id/_*', () => {
+    it('ignores volatile fields like name/_*', () => {
         const base = {
             name: 'Node A',
-            id: 'abc',
             server: '1.1.1.1',
             port: 443,
             _geoEntry: { countryCode: 'US' },
@@ -13,7 +12,6 @@ describe('buildGeoPairCacheId', () => {
         const changed = {
             ...base,
             name: 'Node B',
-            id: 'def',
             _originName: 'Node A',
         } as Record<string, unknown>;
 

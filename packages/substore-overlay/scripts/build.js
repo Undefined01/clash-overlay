@@ -17,8 +17,8 @@ const baseBanner = [
 
 const entries = [
     {
-        entry: resolve(__dirname, '../src/entrypoints/index.ts'),
-        outfile: resolve(__dirname, '../dist/index.js'),
+        entry: resolve(__dirname, '../src/entrypoints/override.ts'),
+        outfile: resolve(__dirname, '../dist/override.js'),
         footer: [
             '',
             '// Clash override entry point',
@@ -26,8 +26,8 @@ const entries = [
         ].join('\n'),
     },
     {
-        entry: resolve(__dirname, '../src/entrypoints/01_detect_entry_landing_geo.ts'),
-        outfile: resolve(__dirname, '../dist/01_detect_entry_landing_geo.js'),
+        entry: resolve(__dirname, '../src/entrypoints/00_parse_name.ts'),
+        outfile: resolve(__dirname, '../dist/00_parse_name.js'),
         footer: [
             '',
             '// Sub-Store operator entry point',
@@ -37,8 +37,19 @@ const entries = [
         ].join('\n'),
     },
     {
-        entry: resolve(__dirname, '../src/entrypoints/02_rename_by_entry_landing.ts'),
-        outfile: resolve(__dirname, '../dist/02_rename_by_entry_landing.js'),
+        entry: resolve(__dirname, '../src/entrypoints/detect_geo.ts'),
+        outfile: resolve(__dirname, '../dist/detect_geo.js'),
+        footer: [
+            '',
+            '// Sub-Store operator entry point',
+            'function operator(proxies, targetPlatform, context) {',
+            '    return __entry.default(proxies, targetPlatform, context);',
+            '}',
+        ].join('\n'),
+    },
+    {
+        entry: resolve(__dirname, '../src/entrypoints/02_rename.ts'),
+        outfile: resolve(__dirname, '../dist/02_rename.js'),
         footer: [
             '',
             '// Sub-Store operator entry point',
@@ -60,6 +71,7 @@ for (const item of entries) {
         target: 'es2020',
         minify: false,
         keepNames: true,
+        treeShaking: true,
         banner: { js: baseBanner },
         footer: { js: item.footer },
     });

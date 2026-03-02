@@ -9,9 +9,9 @@
 //   - cleanup: re-exported from libmodule
 
 import {
-    createModuleMerge, cleanup as genericCleanup, mergeModule as genericMergeModule,
+    createModuleMerge, cleanup as genericCleanup, resolveDeferredAsync,
 } from 'libmodule';
-import type { MergeFn, ModuleFn } from 'libmodule';
+import type { MergeFn } from 'libmodule';
 import type {
     SubStoreArguments,
     SubStoreRequestOptions,
@@ -37,7 +37,9 @@ export interface ClashConfigInput {
     [key: string]: unknown;
 }
 
-export type ClashModule = ModuleFn;
+export type ClashModule = (
+    config: Record<string, unknown>,
+) => Record<string, unknown> | Promise<Record<string, unknown>>;
 
 export interface BuildModuleContextOptions {
     arguments: Map<string, string>;
@@ -82,7 +84,7 @@ export async function mergeModules(
     substoreContext: SubstoreModuleContext,
 ): Promise<Record<string, unknown>> {
     const base = initialModuleState(config, substoreContext);
-    return genericMergeModule(base, modules, { merge: clashModuleMerge });
+    return runModules(base, modules, clashModuleMerge);
 }
 
 /**
@@ -90,4 +92,50 @@ export async function mergeModules(
  */
 export function cleanup(config: Record<string, unknown>): Record<string, unknown> {
     return genericCleanup(config);
+}
+
+async function runModules(
+    base: Record<string, unknown>,
+    modules: ClashModule[],
+    merge: MergeFn,
+): Promise<Record<string, unknown>> {
+    let current: Record<string, unknown> = { ...base };
+    let finalResolved: Record<string, unknown> | null = null;
+
+    const configProxy = new Proxy(Object.create(null) as Record<string, unknown>, {
+        get(_: Record<string, unknown>, prop: string | symbol): unknown {
+            const source = finalResolved ?? current;
+            return source[prop as string];
+        },
+        has(_: Record<string, unknown>, prop: string | symbol): boolean {
+            const source = finalResolved ?? current;
+            return (prop as string) in source;
+        },
+        ownKeys(): Array<string | symbol> {
+            const source = finalResolved ?? current;
+            return Reflect.ownKeys(source);
+        },
+        getOwnPropertyDescriptor(_: Record<string, unknown>, prop: string | symbol): PropertyDescriptor | undefined {
+            const source = finalResolved ?? current;
+            if ((prop as string) in source) {
+                return {
+                    value: source[prop as string],
+                    writable: true,
+                    enumerable: true,
+                    configurable: true,
+                };
+            }
+            return undefined;
+        },
+    });
+
+    for (const module of modules) {
+        const ext = await module(configProxy);
+        current = merge(current, ext);
+    }
+
+    finalResolved = current;
+    const resolved = await resolveDeferredAsync(current) as Record<string, unknown>;
+    finalResolved = resolved;
+    return resolved;
 }

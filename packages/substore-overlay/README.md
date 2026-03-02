@@ -1,14 +1,15 @@
 # substore-overlay
 
-Sub-Store 脚本包，包含 1 个 Clash 覆写入口和 2 个独立 proxy operator。
+Sub-Store 脚本包，包含 1 个 Clash 覆写入口和 3 个独立 proxy operator。
 
 ## 入口文件
 
 源码入口位于 [src/entrypoints](./src/entrypoints)：
 
-- `index.ts`：Clash/Mihomo `main(config)` 覆写入口（模块合并）
-- `01_detect_entry_landing_geo.ts`：`operator(proxies, targetPlatform, context)`，检测前置/落地地理信息
-- `02_rename_by_entry_landing.ts`：`operator(...)`，消费 01 的字段进行统一重命名
+- `override.ts`：Clash/Mihomo `main(config)` 覆写入口（模块合并）
+- `00_parse_name.ts`：`operator(...)`，按节点名写入 `_nodeInfo`（countryCode/multiplier/tags），并可过滤广告名节点
+- `detect_geo.ts`：`operator(proxies, targetPlatform, context)`，检测入口地理信息（写入 `_geoEntry`，并保留落地检测 `_geoLanding`）
+- `02_rename.ts`：`operator(...)`，基于 `_geoEntry`（优先）或 `_nodeInfo` 做最终排序与命名
 
 ## 构建产物
 
@@ -18,13 +19,14 @@ pnpm --filter substore-overlay build
 
 构建后输出：
 
-- `dist/index.js`
-- `dist/01_detect_entry_landing_geo.js`
-- `dist/02_rename_by_entry_landing.js`
+- `dist/override.js`
+- `dist/00_parse_name.js`
+- `dist/detect_geo.js`
+- `dist/02_rename.js`
 
-## 模块系统（index.ts）
+## 模块系统（override.ts）
 
-`index.ts` 使用 `mergeModules` 合并 `src/modules/*` 返回的配置片段。
+`override.ts` 使用 `mergeModules` 合并 `src/modules/*` 返回的配置片段。
 
 模块签名：
 
@@ -34,12 +36,15 @@ pnpm --filter substore-overlay build
 
 可通过 `config._ctx` 获取 Sub-Store 上下文（`arguments: Map<string,string>`、`rawArguments`、`options`、`runtime`）。
 
-## 01/02 Processor
+## 00/01/02 Processor
 
-两个 processor 保持 Sub-Store 原生 operator 写法，但提供 TypeScript 类型约束：
+三个 processor 保持 Sub-Store 原生 operator 写法，但提供 TypeScript 类型约束：
 
-- 01 内置可替换接口类：`LandingApiClient`、`SurgeApiClient`
-- 02 仅做排序与命名，不改动检测逻辑
+- 00 负责按节点名解析并写入 `_nodeInfo`（含广告名节点过滤）
+- 01 `detect_geo` 写入 `_geoEntry`（并保留 `_geoLanding` 落地检测链路）
+- 02 基于 `_geoEntry`（优先）或 `_nodeInfo` 做最终排序与命名（命名来源不拼接 collection 名）
+
+参数结构由各 entrypoint 文件头部的 `valibot` schema 定义，解析辅助函数共享在 `src/lib/args.ts`。
 
 ## 开发命令
 

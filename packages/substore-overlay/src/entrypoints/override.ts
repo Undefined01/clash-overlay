@@ -1,4 +1,4 @@
-// substore-overlay/src/entrypoints/index.ts — Clash/Mihomo 覆写脚本入口
+// substore-overlay/src/entrypoints/override.ts — Clash/Mihomo 覆写脚本入口
 //
 // 基于 Nix overlay 模型：每个模块独立贡献 Clash 原生配置片段，
 // 由 merge engine 合并，列表元素通过 mkBefore/mkAfter/mkOrder 控制位置，

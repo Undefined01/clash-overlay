@@ -3,6 +3,7 @@ import {
     createArgumentMap,
     getBooleanArg,
     getSubstoreContext,
+    getNodeSubscriptionName,
 } from '../src/lib/substore-context.js';
 
 describe('substore-context', () => {
@@ -38,5 +39,28 @@ describe('substore-context', () => {
     it('extracts _ctx from state', () => {
         const ctx = { arguments: new Map(), rawArguments: {}, runtime: {} };
         expect(getSubstoreContext({ _ctx: ctx })).toBe(ctx);
+    });
+
+    it('falls back display name from subscription metadata', () => {
+        expect(getNodeSubscriptionName({
+            _subName: 'ikuuu',
+            _subDisplayName: '',
+        })).toBe('ikuuu');
+
+        expect(getNodeSubscriptionName({
+            _subName: 'rn',
+            _subDisplayName: '',
+            _collectionName: 'test',
+            _collectionDisplayName: '',
+        })).toBe('test/rn');
+
+        expect(getNodeSubscriptionName({
+            _subName: 'rn',
+            _subDisplayName: '',
+            _collectionName: 'test',
+            _collectionDisplayName: '',
+        }, {
+            includeCollectionName: false,
+        })).toBe('rn');
     });
 });
