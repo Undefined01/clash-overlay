@@ -1,4 +1,5 @@
 import type {
+    ProxyNode,
     SubStoreArguments,
     SubStoreRequestOptions,
     SubStoreRuntimeEnv,
@@ -6,8 +7,6 @@ import type {
 } from '../types/substore.js';
 
 export interface SubscriptionNodeInfo {
-    name?: string;
-    _originName?: string;
     _subName?: string;
     _subDisplayName?: string;
 }
@@ -28,7 +27,7 @@ export interface SubstoreModuleContext {
 }
 
 export interface ClashState {
-    proxies: Array<Record<string, unknown>>;
+    proxies: ProxyNode[];
     _ctx: SubstoreModuleContext;
     [key: string]: unknown;
 }

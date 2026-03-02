@@ -1,21 +1,16 @@
 import type { MergeNodeInfo } from '../substore-context.js';
-
-export type ScriptArgValue = string | number | boolean;
+import type { ProxyNode } from '../../types/substore.js';
 
 export interface GeoInfo {
-    ip: string;
     countryCode: string;
-    country: string;
 }
 
-export interface LandingGeoInfo extends GeoInfo {
-    isResidential: boolean;
-}
+export type LandingGeoInfo = GeoInfo;
 
 /**
  * Normalized node info parsed from proxy name.
  *
- * Written by `00_parse_name` as `_nodeInfo`.
+ * Written by `parse_node_name` as `_nodeInfo`.
  */
 export interface NodeInfo {
     /** Standardized country code (e.g. TW/US/CN). */
@@ -36,12 +31,9 @@ export interface GeoPatch {
     _geoCheckedAt?: number;
 }
 
-export interface BaseProxy extends MergeNodeInfo {
-    name?: string;
-    _originName?: string;
+export type BaseProxy = ProxyNode & MergeNodeInfo & {
     server?: string;
-    [key: string]: unknown;
-}
+};
 
 export type WithGeo<TProxy extends BaseProxy> = TProxy & GeoPatch;
 export type WithNodeInfo<TProxy extends BaseProxy> = TProxy & NodeInfoPatch;

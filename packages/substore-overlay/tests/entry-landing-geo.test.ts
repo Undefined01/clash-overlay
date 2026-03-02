@@ -5,15 +5,17 @@ describe('buildGeoPairCacheId', () => {
     it('ignores volatile fields like name/_*', () => {
         const base = {
             name: 'Node A',
+            type: 'ss',
             server: '1.1.1.1',
             port: 443,
             _geoEntry: { countryCode: 'US' },
-        } as Record<string, unknown>;
+            _subName: 'SubA',
+            _collectionName: 'CollectionA',
+        };
         const changed = {
             ...base,
             name: 'Node B',
-            _originName: 'Node A',
-        } as Record<string, unknown>;
+        };
 
         const keyA = buildGeoPairCacheId(base, { landingApi: 'a' });
         const keyB = buildGeoPairCacheId(changed, { landingApi: 'a' });

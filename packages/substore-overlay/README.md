@@ -7,9 +7,9 @@ Sub-Store 脚本包，包含 1 个 Clash 覆写入口和 3 个独立 proxy opera
 源码入口位于 [src/entrypoints](./src/entrypoints)：
 
 - `override.ts`：Clash/Mihomo `main(config)` 覆写入口（模块合并）
-- `00_parse_name.ts`：`operator(...)`，按节点名写入 `_nodeInfo`（countryCode/multiplier/tags），并可过滤广告名节点
-- `detect_geo.ts`：`operator(proxies, targetPlatform, context)`，检测入口地理信息（写入 `_geoEntry`，并保留落地检测 `_geoLanding`）
-- `02_rename.ts`：`operator(...)`，基于 `_geoEntry`（优先）或 `_nodeInfo` 做最终排序与命名
+- `parse_node_name.ts`：`operator(...)`，按节点名写入 `_nodeInfo`（countryCode/multiplier/tags）
+- `detect_geo.ts`：`operator(...)`，检测入口/出口国家代码（写入 `_geoEntry` / `_geoLanding`）
+- `rename_nodes.ts`：`operator(...)`，基于 `_geoEntry`（优先）或 `_nodeInfo` 做最终排序与命名
 
 ## 构建产物
 
@@ -20,9 +20,9 @@ pnpm --filter substore-overlay build
 构建后输出：
 
 - `dist/override.js`
-- `dist/00_parse_name.js`
+- `dist/parse_node_name.js`
 - `dist/detect_geo.js`
-- `dist/02_rename.js`
+- `dist/rename_nodes.js`
 
 ## 模块系统（override.ts）
 
@@ -40,11 +40,15 @@ pnpm --filter substore-overlay build
 
 三个 processor 保持 Sub-Store 原生 operator 写法，但提供 TypeScript 类型约束：
 
-- 00 负责按节点名解析并写入 `_nodeInfo`（含广告名节点过滤）
-- 01 `detect_geo` 写入 `_geoEntry`（并保留 `_geoLanding` 落地检测链路）
-- 02 基于 `_geoEntry`（优先）或 `_nodeInfo` 做最终排序与命名（命名来源不拼接 collection 名）
+- 00 `parse_node_name` 负责按节点名解析并写入 `_nodeInfo`
+- 01 `detect_geo` 写入 `_geoEntry` / `_geoLanding`
+- 02 `rename_nodes` 基于 `_geoEntry`（优先）或 `_nodeInfo` 做最终排序与命名（命名来源不拼接 collection 名）
 
-参数结构由各 entrypoint 文件头部的 `valibot` schema 定义，解析辅助函数共享在 `src/lib/args.ts`。
+参数结构由各 entrypoint 文件头部的 `valibot` schema 定义：
+
+- `parse_node_name`：无参数
+- `detect_geo`：`cache` / `concurrency` / `entry_detection_mode`
+- `rename_nodes`：无参数
 
 ## 开发命令
 

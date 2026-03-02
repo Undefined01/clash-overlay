@@ -1,12 +1,6 @@
 import * as v from 'valibot';
-import type { ScriptOperator, SubStoreArguments, TargetPlatform } from '../types/substore.js';
-import {
-    parseBooleanArg,
-    parsePositiveIntArg,
-    parseRegexArg,
-    parseStringArg,
-    scalarSchema,
-} from '../lib/args.js';
+import type { ProxyNode, ScriptOperator, TargetPlatform } from '../types/substore.js';
+import { booleanArgSchema, positiveIntSchema } from '../lib/args.js';
 import { normalizeCountryCode } from '../lib/proxy-processor/country.js';
 import {
     buildGeoPairCacheId,
@@ -15,433 +9,259 @@ import {
     writeCache,
 } from '../lib/proxy-processor/cache.js';
 import {
-    IpApiLandingClient,
-    NativeSurgeApiClient,
-    RemoteSurgeApiClient,
-    type LandingApiClient,
-    type SurgeApiClient,
-} from '../lib/proxy-processor/geo-clients.js';
-import {
-    createDebugLogger,
     executeAsyncTasks,
-    isIp,
     isRecord,
     safeJsonParse,
-    type DebugLogger,
     withRetry,
 } from '../lib/proxy-processor/runtime.js';
-import type {
-    BaseProxy,
-    GeoInfo,
-    LandingGeoInfo,
-} from '../lib/proxy-processor/types.js';
+import type { GeoInfo, LandingGeoInfo } from '../lib/proxy-processor/types.js';
 
-export const detectGeoScriptArgsSchema = v.object({
-    entry_landing_debug: v.optional(scalarSchema),
-    debug: v.optional(scalarSchema),
+const IP_API_ENTRY_TEMPLATE = 'http://ip-api.com/json/{{host}}?fields=status,countryCode';
+const IP_API_LANDING = 'http://ip-api.com/json?fields=status,countryCode';
+const DOH_API = 'https://1.1.1.1/dns-query';
 
-    entry_landing_geo_enabled: v.optional(scalarSchema),
-    geo_detect_enabled: v.optional(scalarSchema),
+const HTTP_TIMEOUT_MS = 5000;
+const RETRIES = 1;
+const RETRY_DELAY_MS = 800;
 
-    entry_landing_cache: v.optional(scalarSchema),
-    geo_cache: v.optional(scalarSchema),
-    cache: v.optional(scalarSchema),
+const entryDetectionModeSchema = v.fallback(
+    v.pipe(
+        v.string(),
+        v.transform((s) => s.trim()),
+        v.transform((s) => {
+            const lower = s.toLowerCase();
+            if (lower === 'mmdb') return 'MMDB';
+            if (lower === 'ip-api' || lower === 'ip_api' || lower === 'ipapi') return 'ip-api';
+            return s;
+        }),
+        v.picklist(['MMDB', 'ip-api'] as const),
+    ),
+    'ip-api',
+);
 
-    entry_landing_concurrency: v.optional(scalarSchema),
-    geo_concurrency: v.optional(scalarSchema),
-    concurrency: v.optional(scalarSchema),
-
-    entry_landing_timeout: v.optional(scalarSchema),
-    geo_timeout: v.optional(scalarSchema),
-    timeout: v.optional(scalarSchema),
-
-    entry_landing_retries: v.optional(scalarSchema),
-    geo_retries: v.optional(scalarSchema),
-    retries: v.optional(scalarSchema),
-
-    entry_landing_retry_delay: v.optional(scalarSchema),
-    geo_retry_delay: v.optional(scalarSchema),
-    retry_delay: v.optional(scalarSchema),
-
-    entry_landing_api: v.optional(scalarSchema),
-    landing_api: v.optional(scalarSchema),
-
-    entry_geo_api: v.optional(scalarSchema),
-    geo_api: v.optional(scalarSchema),
-
-    entry_doh_api: v.optional(scalarSchema),
-    doh_api: v.optional(scalarSchema),
-
-    entry_landing_surge_http_api: v.optional(scalarSchema),
-    surge_http_api: v.optional(scalarSchema),
-
-    entry_landing_surge_http_api_protocol: v.optional(scalarSchema),
-    surge_http_api_protocol: v.optional(scalarSchema),
-
-    entry_landing_surge_http_api_key: v.optional(scalarSchema),
-    surge_http_api_key: v.optional(scalarSchema),
-
-    entry_landing_residential_regex: v.optional(scalarSchema),
-    geo_residential_regex: v.optional(scalarSchema),
-    residential_regex: v.optional(scalarSchema),
+const detectGeoArgsSchema = v.looseObject({
+    cache: v.optional(booleanArgSchema, true),
+    concurrency: v.optional(positiveIntSchema, 10),
+    entry_detection_mode: v.optional(entryDetectionModeSchema, 'ip-api'),
 });
 
-export type DetectGeoScriptArgs = v.InferOutput<typeof detectGeoScriptArgsSchema> & SubStoreArguments;
-
-const detectGeoArgsSchema = v.object({
-    enabled: v.boolean(),
-    cacheEnabled: v.boolean(),
-    concurrency: v.number(),
-    timeout: v.number(),
-    retries: v.number(),
-    retryDelay: v.number(),
-    landingApi: v.string(),
-    geoApiTemplate: v.string(),
-    dohApi: v.string(),
-    surgeHttpApi: v.string(),
-    surgeHttpApiProtocol: v.string(),
-    surgeHttpApiKey: v.string(),
-    residentialRegex: v.instance(RegExp),
-    debug: v.boolean(),
-});
-
-type DetectGeoArgs = v.InferOutput<typeof detectGeoArgsSchema>;
-
-const detectGeoDefaults = {
-    enabled: true,
-    cacheEnabled: true,
-    concurrency: 10,
-    timeout: 5000,
-    retries: 1,
-    retryDelay: 800,
-    landingApi: 'http://ip-api.com/json?fields=status,country,countryCode,query',
-    geoApiTemplate: 'http://ip-api.com/json/{{ip}}?fields=status,country,countryCode,query',
-    dohApi: 'https://1.1.1.1/dns-query',
-    surgeHttpApi: '',
-    surgeHttpApiProtocol: 'http',
-    surgeHttpApiKey: '',
-    residentialRegexSource: '(家宽|住宅|residential|home)',
-    debug: false,
-} as const;
-
-function parseDetectGeoArgs(rawArgs: SubStoreArguments): DetectGeoArgs {
-    return v.parse(detectGeoArgsSchema, {
-        enabled: parseBooleanArg(rawArgs, ['entry_landing_geo_enabled', 'geo_detect_enabled'], detectGeoDefaults.enabled),
-        cacheEnabled: parseBooleanArg(rawArgs, ['entry_landing_cache', 'geo_cache', 'cache'], detectGeoDefaults.cacheEnabled),
-        concurrency: parsePositiveIntArg(rawArgs, ['entry_landing_concurrency', 'geo_concurrency', 'concurrency'], detectGeoDefaults.concurrency),
-        timeout: parsePositiveIntArg(rawArgs, ['entry_landing_timeout', 'geo_timeout', 'timeout'], detectGeoDefaults.timeout),
-        retries: parsePositiveIntArg(rawArgs, ['entry_landing_retries', 'geo_retries', 'retries'], detectGeoDefaults.retries),
-        retryDelay: parsePositiveIntArg(rawArgs, ['entry_landing_retry_delay', 'geo_retry_delay', 'retry_delay'], detectGeoDefaults.retryDelay),
-        landingApi: parseStringArg(rawArgs, ['entry_landing_api', 'landing_api'], detectGeoDefaults.landingApi),
-        geoApiTemplate: parseStringArg(rawArgs, ['entry_geo_api', 'geo_api'], detectGeoDefaults.geoApiTemplate),
-        dohApi: parseStringArg(rawArgs, ['entry_doh_api', 'doh_api'], detectGeoDefaults.dohApi),
-        surgeHttpApi: parseStringArg(rawArgs, ['entry_landing_surge_http_api', 'surge_http_api'], detectGeoDefaults.surgeHttpApi),
-        surgeHttpApiProtocol: parseStringArg(
-            rawArgs,
-            ['entry_landing_surge_http_api_protocol', 'surge_http_api_protocol'],
-            detectGeoDefaults.surgeHttpApiProtocol,
-        ),
-        surgeHttpApiKey: parseStringArg(rawArgs, ['entry_landing_surge_http_api_key', 'surge_http_api_key'], detectGeoDefaults.surgeHttpApiKey),
-        residentialRegex: parseRegexArg(
-            rawArgs,
-            ['entry_landing_residential_regex', 'geo_residential_regex', 'residential_regex'],
-            detectGeoDefaults.residentialRegexSource,
-        ),
-        debug: parseBooleanArg(rawArgs, ['entry_landing_debug', 'debug'], detectGeoDefaults.debug),
-    });
-}
-
-/** Input proxy shape consumed by this operator. */
-export interface DetectGeoInputProxy extends BaseProxy {
-    _geoEntry?: GeoInfo;
-    _geoLanding?: LandingGeoInfo;
-    _geoCheckedAt?: number;
-}
+/**
+ * `detect_geo` operator `$arguments` (parsed via `valibot`).
+ *
+ * - `cache`: `bool`
+ *   - Accepts: `true`/`false`, `1`/`0`, `'true'`/`'false'`, `'1'`/`'0'`
+ *   - Default: `true`
+ * - `concurrency`: `int` (positive)
+ *   - Default: `10`
+ * - `entry_detection_mode`: `'MMDB' | 'ip-api'`
+ *   - `'MMDB'`: `ProxyUtils.doh` -> `ProxyUtils.MMDB().geoip(ip)`
+ *   - `'ip-api'`: `http://ip-api.com/json/{host}?fields=status,countryCode`
+ *   - Default: `'ip-api'`
+ */
+export type DetectGeoArgs = v.InferOutput<typeof detectGeoArgsSchema>;
 
 /** Fields patched by this operator. */
 export type DetectGeoPatch = { _geoEntry: GeoInfo; _geoLanding: LandingGeoInfo; _geoCheckedAt: number };
 
+/** Input proxy shape consumed by this operator (besides {@link ProxyNode}). */
+export interface DetectGeoInputProxy {
+    server?: string;
+}
+
 /** Output proxy shape: original input plus detected geo fields. */
-export type DetectGeoOutputProxy<TProxy extends DetectGeoInputProxy> = TProxy & DetectGeoPatch;
+export type DetectGeoOutputProxy = ProxyNode & DetectGeoInputProxy & DetectGeoPatch;
 
-const unknownGeo: GeoInfo = { ip: '', countryCode: 'ZZ', country: '' };
-
-const operator: ScriptOperator<DetectGeoInputProxy> = async (
-    proxies,
-    _targetPlatform,
-    _context,
-) => {
-    if (!Array.isArray(proxies) || proxies.length === 0) return proxies;
-
-    const args = parseDetectGeoArgs(typeof $arguments !== 'undefined' ? $arguments : {});
-    const logDebug = createDebugLogger('DetectGeo', args.debug);
-    logDebug('operator start', {
-        proxyCount: proxies.length,
-        enabled: args.enabled,
-        cacheEnabled: args.cacheEnabled,
-        concurrency: args.concurrency,
-        timeout: args.timeout,
-        retries: args.retries,
-        retryDelay: args.retryDelay,
-        landingApi: args.landingApi,
-        geoApiTemplate: args.geoApiTemplate,
-        dohApi: args.dohApi,
-        surgeHttpApi: args.surgeHttpApi,
-        surgeHttpApiProtocol: args.surgeHttpApiProtocol,
-    });
-
-    if (!args.enabled) return proxies;
-
-    const landingApiClient: LandingApiClient = new IpApiLandingClient();
-    const surgeApiClient: SurgeApiClient = args.surgeHttpApi
-        ? new RemoteSurgeApiClient(args.surgeHttpApi, args.surgeHttpApiProtocol, args.surgeHttpApiKey)
-        : new NativeSurgeApiClient();
-
-    const runtimeTarget = detectRuntimeTarget();
-    logDebug('runtime target resolved', {
-        runtimeTarget,
-        surgeClient: args.surgeHttpApi ? 'remote' : 'native',
-    });
-    if (!runtimeTarget && !args.surgeHttpApi) {
-        logDebug('landing detection risk', {
-            reason: 'runtimeTarget is null and entry_landing_surge_http_api is empty',
-            impact: 'cannot produce policy node, landing geo may fallback to ZZ',
-            suggestion: 'provide entry_landing_surge_http_api or run in Surge/Loon runtime',
-        });
-    }
+const operator: ScriptOperator<ProxyNode & DetectGeoInputProxy, DetectGeoOutputProxy> = async (proxies, _targetPlatform, _context) => {
+    const args = v.parse(detectGeoArgsSchema, typeof $arguments !== 'undefined' ? $arguments : {});
+    const entryDetector: GeoDetector = args.entry_detection_mode === 'MMDB' ? new MMDBGeoDetector() : new IpApiGeoDetector();
+    const landingDetector: LandingGeoDetector = new SubStoreSurgeGeoDetector();
 
     const tasks = proxies.map(proxy => async () => {
-        await detectOneProxy(proxy, args, runtimeTarget, landingApiClient, surgeApiClient, logDebug);
+        return await detectOneProxy(proxy, args, entryDetector, landingDetector);
     });
-    await executeAsyncTasks(tasks, args.concurrency, logDebug);
-    logDebug('operator completed', { proxyCount: proxies.length });
-
-    return proxies;
+    const results = await executeAsyncTasks(tasks, args.concurrency);
+    return results;
 };
 
 export default operator;
+
+interface GeoDetector {
+    detect(host: string): Promise<{ countryCode: string }>;
+}
+
+class MMDBGeoDetector implements GeoDetector {
+    async detect(host: string): Promise<{ countryCode: string }> {
+        const ip = await this.resolveIp(host);
+        if (!ip) return { countryCode: 'ZZ' };
+        if (typeof ProxyUtils === 'undefined' || !ProxyUtils || typeof ProxyUtils.MMDB !== 'function') {
+            return { countryCode: 'ZZ' };
+        }
+
+        const mmdb = new ProxyUtils.MMDB();
+        const iso = mmdb.geoip(ip);
+        return { countryCode: normalizeCountryCode(iso) };
+    }
+
+    private async resolveIp(host: string): Promise<string> {
+        const value = String(host || '').trim();
+        if (!value) return '';
+        if (typeof ProxyUtils !== 'undefined' && ProxyUtils && typeof ProxyUtils.isIP === 'function' && ProxyUtils.isIP(value)) {
+            return value;
+        }
+        if (typeof ProxyUtils === 'undefined' || !ProxyUtils || typeof ProxyUtils.doh !== 'function') {
+            return '';
+        }
+
+        const packet = await withRetry(
+            () => ProxyUtils.doh({ url: DOH_API, domain: value, type: 'A', timeout: HTTP_TIMEOUT_MS }),
+            RETRIES,
+            RETRY_DELAY_MS,
+            undefined,
+            `doh:${value}`,
+        );
+
+        const answers = (packet && typeof packet === 'object' && 'answers' in packet ? (packet as { answers?: unknown }).answers : null) as unknown;
+        if (!Array.isArray(answers)) return '';
+        const firstA = answers.find((a) => isRecord(a) && a.type === 'A' && typeof a.data === 'string') as { data?: string } | undefined;
+        const ip = String(firstA?.data || '').trim();
+        if (typeof ProxyUtils !== 'undefined' && ProxyUtils && typeof ProxyUtils.isIP === 'function' && ProxyUtils.isIP(ip)) {
+            return ip;
+        }
+        return '';
+    }
+}
+
+class IpApiGeoDetector implements GeoDetector {
+    async detect(host: string): Promise<{ countryCode: string }> {
+        const value = String(host || '').trim();
+        if (!value) return { countryCode: 'ZZ' };
+        if (typeof $substore === 'undefined') return { countryCode: 'ZZ' };
+
+        const url = IP_API_ENTRY_TEMPLATE.replace(/\{\{host\}\}/g, encodeURIComponent(value));
+        const response = await withRetry(
+            () => $substore.http.get({ url, timeout: HTTP_TIMEOUT_MS, headers: { accept: 'application/json' } }),
+            RETRIES,
+            RETRY_DELAY_MS,
+            undefined,
+            `ip-api-entry:${value}`,
+        );
+
+        const parsed = safeJsonParse<Record<string, unknown>>(response.body) || {};
+        if (String(parsed.status || '') && String(parsed.status || '') !== 'success') {
+            return { countryCode: 'ZZ' };
+        }
+        return { countryCode: normalizeCountryCode(parsed.countryCode) };
+    }
+}
+
+interface LandingGeoDetector {
+    detect(node: ProxyNode): Promise<{ countryCode: string }>;
+}
+
+class SubStoreSurgeGeoDetector implements LandingGeoDetector {
+    async detect(node: ProxyNode): Promise<{ countryCode: string }> {
+        if (typeof $substore === 'undefined') return { countryCode: 'ZZ' };
+
+        const runtimeTarget = detectRuntimeTarget();
+        if (!runtimeTarget) return { countryCode: 'ZZ' };
+
+        const policyDescriptor = producePolicyDescriptor(node, runtimeTarget);
+        if (!policyDescriptor) return { countryCode: 'ZZ' };
+
+        const response = await withRetry(
+            () =>
+                $substore.http.get({
+                    url: IP_API_LANDING,
+                    timeout: HTTP_TIMEOUT_MS,
+                    headers: { accept: 'application/json' },
+                    node: policyDescriptor,
+                    'policy-descriptor': policyDescriptor,
+                }),
+            RETRIES,
+            RETRY_DELAY_MS,
+            undefined,
+            `ip-api-landing:${String(node.name || '')}`,
+        );
+
+        const parsed = safeJsonParse<Record<string, unknown>>(response.body) || {};
+        if (String(parsed.status || '') && String(parsed.status || '') !== 'success') {
+            return { countryCode: 'ZZ' };
+        }
+        return { countryCode: normalizeCountryCode(parsed.countryCode) };
+    }
+}
+
 export { buildGeoPairCacheId };
 
-async function detectOneProxy<TProxy extends DetectGeoInputProxy>(
-    proxy: TProxy,
+async function detectOneProxy(
+    proxy: ProxyNode & DetectGeoInputProxy,
     args: DetectGeoArgs,
-    runtimeTarget: TargetPlatform | null,
-    landingApiClient: LandingApiClient,
-    surgeApiClient: SurgeApiClient,
-    logDebug: DebugLogger,
-): Promise<DetectGeoOutputProxy<TProxy>> {
-    if (typeof proxy._originName === 'undefined') proxy._originName = String(proxy.name || '');
-    logDebug('detectOneProxy start', {
-        name: proxy._originName,
-        server: proxy.server,
-    });
+    entryDetector: GeoDetector,
+    landingDetector: LandingGeoDetector,
+): Promise<DetectGeoOutputProxy> {
+    if (typeof proxy._originName === 'undefined') {
+        proxy._originName = String(proxy.name || '');
+    }
 
     const cacheId = buildGeoPairCacheId(proxy, {
-        landingApi: args.landingApi,
-        geoApiTemplate: args.geoApiTemplate,
-        dohApi: args.dohApi,
-        residentialPattern: args.residentialRegex.source,
+        entry_detection_mode: args.entry_detection_mode,
+        ip_api_entry: IP_API_ENTRY_TEMPLATE,
+        ip_api_landing: IP_API_LANDING,
+        doh_api: DOH_API,
     });
 
-    if (args.cacheEnabled) {
+    if (args.cache) {
         const cached = readCache(cacheId);
         if (isGeoPairCacheValue(cached)) {
             proxy._geoEntry = cached.entry;
             proxy._geoLanding = cached.landing;
             proxy._geoCheckedAt = Number(cached.checkedAt) || Date.now();
-            logDebug('geo pair cache hit', { cacheId, name: proxy._originName });
-            logDebug('geo pair cache payload', {
-                entry: proxy._geoEntry,
-                landing: proxy._geoLanding,
-                checkedAt: proxy._geoCheckedAt,
-            });
-            return proxy as DetectGeoOutputProxy<TProxy>;
+            return proxy as DetectGeoOutputProxy;
         }
     }
 
-    const server = String(proxy.server || '');
-    const entryIp = await resolveEntryIp(server, args, logDebug);
-    const entryGeo = await geoLookup(entryIp, args, logDebug);
-    const landingGeo = await detectLandingGeo(
-        proxy,
-        args,
-        runtimeTarget,
-        landingApiClient,
-        surgeApiClient,
-        logDebug,
-    );
+    const entry = await entryDetector.detect(String(proxy.server || ''));
+    const landing = await landingDetector.detect(proxy);
+
+    const entryGeo: GeoInfo = { countryCode: normalizeCountryCode(entry.countryCode) };
+    const landingGeo: LandingGeoInfo = { countryCode: normalizeCountryCode(landing.countryCode) };
 
     proxy._geoEntry = entryGeo;
     proxy._geoLanding = landingGeo;
     proxy._geoCheckedAt = Date.now();
-    logDebug('detectOneProxy completed', {
-        name: proxy._originName,
-        entryIp,
-        entryGeo,
-        landingGeo,
-    });
 
-    if (args.cacheEnabled) {
-        writeCache(cacheId, {
-            entry: entryGeo,
-            landing: landingGeo,
-            checkedAt: proxy._geoCheckedAt,
-        }, defaultCacheTtlMs());
-        logDebug('geo pair cache write', { cacheId, name: proxy._originName });
+    if (args.cache) {
+        writeCache(
+            cacheId,
+            {
+                entry: entryGeo,
+                landing: landingGeo,
+                checkedAt: proxy._geoCheckedAt,
+            },
+            defaultCacheTtlMs(),
+        );
     }
 
-    return proxy as DetectGeoOutputProxy<TProxy>;
-}
-
-async function resolveEntryIp(server: string, args: DetectGeoArgs, logDebug: DebugLogger): Promise<string> {
-    if (!server) {
-        logDebug('resolveEntryIp skipped: empty server');
-        return '';
-    }
-    if (isIp(server)) {
-        logDebug('resolveEntryIp direct ip', { server });
-        return server;
-    }
-
-    const cacheId = `entry-ip:${server}:${args.dohApi}`;
-    const cached = readCache(cacheId);
-    if (typeof cached === 'string' && cached) {
-        logDebug('entry ip cache hit', { server, ip: cached, cacheId });
-        return cached;
-    }
-
-    const dohUrl = `${args.dohApi}?name=${encodeURIComponent(server)}&type=A`;
-    logDebug('entry ip lookup request', { server, dohUrl });
-    const response = await withRetry(
-        () =>
-            $substore.http.get({
-                url: dohUrl,
-                timeout: args.timeout,
-                headers: { accept: 'application/dns-json' },
-            }),
-        args.retries,
-        args.retryDelay,
-        logDebug,
-        `resolveEntryIp:${server}`,
-    );
-
-    const parsed = safeJsonParse<{ Answer?: Array<{ data?: unknown }> }>(response.body) || {};
-    const answers = Array.isArray(parsed.Answer) ? parsed.Answer : [];
-    const ip = String((answers.find(item => isIp(String(item.data || ''))) || {}).data || '');
-    if (ip && args.cacheEnabled) {
-        writeCache(cacheId, ip, defaultCacheTtlMs());
-        logDebug('entry ip cache write', { server, ip, cacheId });
-    }
-    logDebug('entry ip lookup result', { server, ip: ip || '(empty)' });
-    return ip;
-}
-
-async function geoLookup(ip: string, args: DetectGeoArgs, logDebug: DebugLogger): Promise<GeoInfo> {
-    if (!ip) {
-        logDebug('geoLookup skipped: empty ip');
-        return unknownGeo;
-    }
-
-    const cacheId = `geo-ip:${ip}:${args.geoApiTemplate}`;
-    const cached = readCache(cacheId);
-    if (isRecord(cached)) {
-        logDebug('geo cache hit', { ip, cacheId });
-        return {
-            ip: String(cached.ip || ip),
-            countryCode: normalizeCountryCode(cached.countryCode),
-            country: String(cached.country || ''),
-        };
-    }
-
-    const url = args.geoApiTemplate.replace(/\{\{ip\}\}/g, encodeURIComponent(ip));
-    logDebug('geo lookup request', { ip, url });
-    const response = await withRetry(
-        () => $substore.http.get({ url, timeout: args.timeout }),
-        args.retries,
-        args.retryDelay,
-        logDebug,
-        `geoLookup:${ip}`,
-    );
-    const parsed = safeJsonParse<Record<string, unknown>>(response.body) || {};
-    const geo: GeoInfo = {
-        ip: String(parsed.query || ip),
-        countryCode: normalizeCountryCode(parsed.countryCode),
-        country: String(parsed.country || ''),
-    };
-    if (args.cacheEnabled) {
-        writeCache(cacheId, geo, defaultCacheTtlMs());
-        logDebug('geo cache write', { ip, cacheId, geo });
-    }
-    logDebug('geo lookup result', { ip, geo });
-    return geo;
-}
-
-async function detectLandingGeo(
-    proxy: DetectGeoInputProxy,
-    args: DetectGeoArgs,
-    runtimeTarget: TargetPlatform | null,
-    landingApiClient: LandingApiClient,
-    surgeApiClient: SurgeApiClient,
-    logDebug: DebugLogger,
-): Promise<LandingGeoInfo> {
-    const marker = String(proxy._originName || proxy.name || '');
-    const isResidential = args.residentialRegex.test(marker);
-    const node = produceNode(proxy, args.surgeHttpApi ? 'Surge' : runtimeTarget);
-    logDebug('landing detection prepared', {
-        name: proxy._originName,
-        marker,
-        isResidential,
-        runtimeTarget,
-        nodeAvailable: Boolean(node),
-    });
-
-    if (!node) {
-        logDebug('landing detection fallback: no node produced', { name: proxy._originName });
-        logDebug('landing detection fallback hint', {
-            runtimeTarget,
-            surgeHttpApi: args.surgeHttpApi,
-            suggestion: 'if this is Node runtime, configure entry_landing_surge_http_api',
-        });
-        return { ...unknownGeo, isResidential };
-    }
-
-    const geo = await withRetry(
-        () =>
-            landingApiClient.lookup({
-                apiUrl: args.landingApi,
-                timeout: args.timeout,
-                node,
-                requester: surgeApiClient,
-            }),
-        args.retries,
-        args.retryDelay,
-        logDebug,
-        `landingLookup:${proxy._originName || proxy.name || '(unknown)'}`,
-    );
-
-    const landingGeo: LandingGeoInfo = {
-        ip: String(geo.ip || ''),
-        countryCode: normalizeCountryCode(geo.countryCode),
-        country: String(geo.country || ''),
-        isResidential,
-    };
-    logDebug('landing detection result', { name: proxy._originName, landingGeo });
-    return landingGeo;
+    return proxy as DetectGeoOutputProxy;
 }
 
 function detectRuntimeTarget(): TargetPlatform | null {
-    const env = ($substore && $substore.env) || {};
-    if (env.isLoon) return 'Loon';
-    if (env.isSurge) return 'Surge';
+    const env = typeof $substore === 'undefined' ? null : $substore.env;
+    if (env?.isLoon) return 'Loon';
+    if (env?.isSurge) return 'Surge';
     return null;
 }
 
-function produceNode(proxy: DetectGeoInputProxy, targetPlatform: TargetPlatform | null): string | null {
-    if (!targetPlatform || typeof ProxyUtils === 'undefined') return null;
-    if (!ProxyUtils || typeof ProxyUtils.produce !== 'function') return null;
-    const produce = ProxyUtils.produce as (proxies: DetectGeoInputProxy[], platform: TargetPlatform) => unknown;
-    const result = produce([proxy], targetPlatform);
-    return typeof result === 'string' && result ? result : null;
+function producePolicyDescriptor(proxy: ProxyNode, targetPlatform: TargetPlatform): string | null {
+    if (typeof ProxyUtils === 'undefined' || !ProxyUtils || typeof ProxyUtils.produce !== 'function') return null;
+    const produced = ProxyUtils.produce([proxy], targetPlatform);
+    if (typeof produced !== 'string' || !produced) return null;
+
+    const candidates = produced
+        .split(/[\r\n]+/)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0 && !line.startsWith('#!'));
+    return candidates.length > 0 ? candidates[candidates.length - 1] : null;
 }
 
 function isGeoPairCacheValue(value: Record<string, unknown> | string | null): value is {

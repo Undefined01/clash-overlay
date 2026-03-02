@@ -5,15 +5,10 @@ const dayMs = 24 * 60 * 60 * 1000;
 
 export interface GeoPairCacheValue {
     entry: {
-        ip: string;
         countryCode: string;
-        country: string;
     };
     landing: {
-        ip: string;
         countryCode: string;
-        country: string;
-        isResidential: boolean;
     };
     checkedAt: number;
 }

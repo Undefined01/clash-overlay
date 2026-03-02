@@ -6,7 +6,7 @@
 
 import { mergeModules, cleanup, buildModuleContext } from '../lib/merge.js';
 import type { ClashModule } from '../lib/merge.js';
-import type { SubStoreArguments } from '../types/substore.js';
+import type { ProxyNode, SubStoreArguments } from '../types/substore.js';
 import { createArgumentMap } from '../lib/substore-context.js';
 
 // ── 模块导入 ──
@@ -47,7 +47,7 @@ async function main(config: Record<string, unknown>): Promise<Record<string, unk
     const argumentsMap = createArgumentMap(rawArgs);
 
     const workingConfig = config as {
-        proxies?: Array<Record<string, unknown>>;
+        proxies?: ProxyNode[];
         [key: string]: unknown;
     };
     if (!Array.isArray(workingConfig.proxies)) workingConfig.proxies = [];
@@ -61,7 +61,7 @@ async function main(config: Record<string, unknown>): Promise<Record<string, unk
 
     const merged = await mergeModules(
         modules,
-        workingConfig as { proxies: Array<{ name: string }> },
+        workingConfig as { proxies: ProxyNode[] },
         moduleContext,
     );
 

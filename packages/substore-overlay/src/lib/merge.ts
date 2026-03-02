@@ -17,6 +17,7 @@ import type {
     SubStoreRequestOptions,
     SubStoreRuntimeEnv,
     SubStoreScriptContext,
+    ProxyNode,
 } from '../types/substore.js';
 import type { SubstoreModuleContext } from './substore-context.js';
 
@@ -33,7 +34,7 @@ export const clashModuleMerge: MergeFn = createModuleMerge({
 // ─── Module System ──────────────────────────────────────────────────
 
 export interface ClashConfigInput {
-    proxies: Array<{ name: string; [key: string]: unknown }>;
+    proxies: ProxyNode[];
     [key: string]: unknown;
 }
 

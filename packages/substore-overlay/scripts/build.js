@@ -26,8 +26,8 @@ const entries = [
         ].join('\n'),
     },
     {
-        entry: resolve(__dirname, '../src/entrypoints/00_parse_name.ts'),
-        outfile: resolve(__dirname, '../dist/00_parse_name.js'),
+        entry: resolve(__dirname, '../src/entrypoints/parse_node_name.ts'),
+        outfile: resolve(__dirname, '../dist/parse_node_name.js'),
         footer: [
             '',
             '// Sub-Store operator entry point',
@@ -48,8 +48,8 @@ const entries = [
         ].join('\n'),
     },
     {
-        entry: resolve(__dirname, '../src/entrypoints/02_rename.ts'),
-        outfile: resolve(__dirname, '../dist/02_rename.js'),
+        entry: resolve(__dirname, '../src/entrypoints/rename_nodes.ts'),
+        outfile: resolve(__dirname, '../dist/rename_nodes.js'),
         footer: [
             '',
             '// Sub-Store operator entry point',

@@ -49,31 +49,33 @@ export async function withRetry<T>(
     throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
-export async function executeAsyncTasks(
-    tasks: Array<() => Promise<void>>,
+export async function executeAsyncTasks<T>(
+    tasks: Array<() => Promise<T>>,
     concurrency: number,
     logDebug?: DebugLogger,
-): Promise<void> {
-    if (!tasks.length) return;
+): Promise<Array<T>> {
+    if (!tasks.length) return [];
+
     const maxWorkers = Math.max(1, Math.min(concurrency, tasks.length));
     let cursor = 0;
     if (logDebug) {
         logDebug('executeAsyncTasks start', { taskCount: tasks.length, maxWorkers });
     }
 
-    async function worker(): Promise<void> {
+    async function worker(): Promise<T | undefined> {
         while (true) {
             const index = cursor;
             cursor += 1;
             if (index >= tasks.length) return;
-            await tasks[index]();
+            return await tasks[index]();
         }
     }
 
-    await Promise.all(Array.from({ length: maxWorkers }, () => worker()));
+    const results = await Promise.all(Array.from({ length: maxWorkers }, () => worker()));
     if (logDebug) {
         logDebug('executeAsyncTasks completed', { taskCount: tasks.length });
     }
+    return results.filter((r) => r !== undefined);
 }
 
 export function safeJsonParse<T>(text: string): T | null {
