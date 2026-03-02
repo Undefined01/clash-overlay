@@ -2,7 +2,9 @@
 import { describe, it, expect } from 'vitest';
 import {
     deferred,
+    mkDefault,
     applyOverlays, applyOverlaysAsync, makeExtensible,
+    moduleMerge,
 } from '../src/index.js';
 import type { MergeFn } from '../src/index.js';
 
@@ -118,6 +120,24 @@ describe('applyOverlays', () => {
             expect(() => {
                 applyOverlays({ a: 1 }, [(final) => ({ b: Object.keys(final) })]);
             }).toThrow(/Cannot enumerate 'final'/);
+        });
+
+        it('final access inside deferred sees normalized values with moduleMerge', () => {
+            const result = applyOverlays(
+                {},
+                [
+                    () => ({ items: ['a'], port: mkDefault(100) }),
+                    () => ({ items: ['b'] }),
+                    (final) => ({
+                        count: deferred(() => (final.items as unknown[]).length),
+                        portPlus: deferred(() => (final.port as number) + 1),
+                    }),
+                ],
+                { merge: moduleMerge },
+            );
+            expect(result.items).toEqual(['a', 'b']);
+            expect(result.count).toBe(2);
+            expect(result.portPlus).toBe(101);
         });
     });
 

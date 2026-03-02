@@ -6,6 +6,7 @@ import { mkOrder } from 'libmodule';
 export default function customModule(
     config: Record<string, unknown>,
 ): Record<string, unknown> {
+
     return {
         proxies: [
             { name: 'easyconnect', type: 'socks5', server: '127.0.0.1', port: 1080 },

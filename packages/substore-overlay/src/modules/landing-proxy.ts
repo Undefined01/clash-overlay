@@ -1,38 +1,48 @@
 // substore-overlay/src/modules/landing-proxy.ts — 落地代理
 
-import { deferred, mkOrder } from 'libmodule';
-import { GROUP_COMMON, externalIcon } from '../lib/clash.js';
+// 文档: https://github.com/MetaCubeX/Meta-Docs/blob/e8662ede5748e9bc5a23764ce447ea4f833d8e6c/docs/config/proxies/dialer-proxy.md
+
+import { deferred, mkOrder, ModuleFn } from 'libmodule';
+import { GROUP_COMMON, PRIMITIVE_GROUPS, externalIcon, reorderProxies } from '../lib/clash.js';
+import { ProxyNode } from '../types/substore.js';
+import { ModuleContext } from './lib.js';
+import { ClashMetaConfig } from '../types/clash_meta_config.js';
+import { NodeInfo } from '../lib/proxy-processor/types.js';
 
 export default function landingProxyModule(
-    config: Record<string, unknown>,
-): Record<string, unknown> {
-    const proxies = (config.proxies as Array<{ name?: unknown }> || [])
-        .map(p => String(p.name || ''))
-        .filter(Boolean);
-    const LANDING_FILTER = '(?i)落地|Landing|固定|Residential';
+    ctx: ModuleContext<{}>,
+): ModuleFn {
+    return () => {
+    const forwardProxies = ctx.originalConfig.proxies?.filter(p => {
+        let tags = (p._nodeInfo as NodeInfo)?.tags || [];
+        return !tags.includes('落地');
+    }).map(p => p.name as string) ?? [];
+    const landingProxies = ctx.originalConfig.proxies?.filter(p => {
+        let tags = (p._nodeInfo as NodeInfo)?.tags || [];
+        return tags.includes('家宽') || tags.includes('落地');
+    }).map(p => p.name as string) ?? [];
 
     return {
-        'proxy-groups': mkOrder(600, [
-            {
+        _proxyGroupMap: {
+            '手动选择': {
+                proxies: mkOrder(705, ['落地代理']),
+            },
+            '落地代理': {
                 ...GROUP_COMMON,
                 name: '落地代理',
                 type: 'url-test',
-                proxies,
-                filter: LANDING_FILTER,
-                'dialer-proxy': '手动选择',
+                proxies: landingProxies.concat(PRIMITIVE_GROUPS),
+                'dialer-proxy': '落地前置',
                 icon: externalIcon('ABvCfQAJ'),
             },
-            {
+            '落地前置': {
                 ...GROUP_COMMON,
-                name: '落地切换',
+                name: '落地前置',
                 type: 'select',
-                proxies: deferred(() => [
-                    '落地代理',
-                    '国外 AI',
-                    ...(config._allSelectables as string[]),
-                ]),
+                proxies: reorderProxies(PRIMITIVE_GROUPS.concat(forwardProxies), 'REJECT'),
                 icon: externalIcon('ABvCfQAJ'),
             },
-        ]),
+        },
     };
+};
 }

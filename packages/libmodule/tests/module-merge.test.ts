@@ -58,12 +58,12 @@ describe('moduleMerge — array merge', () => {
         )).toThrow(/Type mismatch/);
     });
 
-    it('skips metadata keys from ordered list wrapping', () => {
+    it('underscored keys use the same ordered merge rules', () => {
         const result = mergeWith(
             { _internal: ['a'] },
             { _internal: ['b'] },
         );
-        expect(result._internal).toEqual(['b']);
+        expect(result._internal).toEqual(['a', 'b']);
     });
 
     it('handles empty arrays', () => {
@@ -263,25 +263,25 @@ describe('moduleMerge — deferred values', () => {
     });
 });
 
-// ─── Metadata keys ──────────────────────────────────────────────────
+// ─── Underscored keys follow normal rules ───────────────────────────
 
-describe('moduleMerge — metadata keys (_*)', () => {
-    it('later metadata keys win', () => {
-        const result = mergeWith({ _meta: 'first' }, { _meta: 'second' });
-        expect(result._meta).toBe('second');
+describe('moduleMerge — underscored keys', () => {
+    it('same-priority scalar conflicts still throw', () => {
+        expect(() => mergeWith({ _meta: 'first' }, { _meta: 'second' }))
+            .toThrow(/Scalar conflict.*_meta/);
     });
 
-    it('metadata arrays are NOT ordered lists', () => {
+    it('arrays are ordered/concatenated like normal keys', () => {
         const result = mergeWith({ _proxies: ['a'] }, { _proxies: ['b', 'c'] });
-        expect(result._proxies).toEqual(['b', 'c']);
+        expect(result._proxies).toEqual(['a', 'b', 'c']);
     });
 
-    it('metadata objects are replaced, not deep merged', () => {
+    it('objects are deep merged like normal keys', () => {
         const result = mergeWith(
             { _ctx: { a: 1, b: 2 } },
             { _ctx: { b: 3 } },
         );
-        expect(result._ctx).toEqual({ b: 3 });
+        expect(result._ctx).toEqual({ a: 1, b: 3 });
     });
 });
 
@@ -327,26 +327,6 @@ describe('createModuleMerge — uniqueKeyFields', () => {
             { merge },
         );
         expect(result.config).toEqual({ a: 2 });
-    });
-});
-
-// ─── createModuleMerge with metadataPrefix ──────────────────────────
-
-describe('createModuleMerge — metadataPrefix', () => {
-    it('custom prefix changes which keys are metadata', () => {
-        const merge = createModuleMerge({ metadataPrefix: '$' });
-        const result = applyOverlays(
-            {},
-            [
-                () => ({ $internal: ['a'], _normal: ['x'] }),
-                () => ({ $internal: ['b'], _normal: ['y'] }),
-            ],
-            { merge },
-        );
-        // $internal is metadata → last wins
-        expect(result.$internal).toEqual(['b']);
-        // _normal is NOT metadata → ordered list merge
-        expect(result._normal).toEqual(['x', 'y']);
     });
 });
 
@@ -410,6 +390,16 @@ describe('moduleMerge — edge cases', () => {
             { rules: mkOrder(600, ['early']) },
         );
         expect(result.rules).toEqual(['first', 'early', 'middle-a', 'middle-b', 'last']);
+    });
+
+    it('mixed ordered and plain arrays in deep attrsets', () => {
+        const result: any = mergeWith(
+            { _ctx: { rules: mkBefore(['first']) } },
+            { _ctx: { rules: ['middle-a', 'middle-b'] } },
+            { _ctx: { rules: mkAfter(['last']) } },
+            { _ctx: { rules: mkOrder(600, ['early']) } },
+        );
+        expect(result._ctx.rules).toEqual(['first', 'early', 'middle-a', 'middle-b', 'last']);
     });
 
     it('many overlays with complex interleaving', () => {

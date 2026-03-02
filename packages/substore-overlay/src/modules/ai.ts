@@ -10,7 +10,7 @@ export default function aiModule(
 
     return {
         rules: mkOrder(900, [
-            rulesetRule(ai.name, '落地切换'),
+            rulesetRule(ai.name, '国外 AI'),
         ]),
 
         'rule-providers': {

@@ -6,9 +6,9 @@
 //   - Ordered list collection for arrays (via mkBefore / mkAfter / mkOrder)
 //   - Deep recursive merge for objects
 //   - Nix-compatible numeric priority conflict resolution for scalars
-//   - Metadata key passthrough (prefix-based, default "_")
+//   - Uniform merge semantics for all keys
 
-import { isDeferred } from './deferred.js';
+import { deferred, isDeferred } from './deferred.js';
 import { isOverride, getPriority, unwrapPriority } from './priority.js';
 import { isOrdered, isOrderedList, isArrayLike, DEFAULT_ORDER } from './order.js';
 import type { MergeFn, OrderedList } from './types.js';
@@ -39,15 +39,49 @@ function deepMerge(
 ): Record<string, unknown> {
     const result = { ...target };
     for (const [key, value] of Object.entries(source)) {
-        if (isPlainObject(result[key]) && isPlainObject(value)) {
-            result[key] = deepMerge(result[key], value);
-        } else if (Array.isArray(result[key]) && Array.isArray(value)) {
-            result[key] = [...(result[key] as unknown[]), ...value];
-        } else {
-            result[key] = value;
-        }
+        result[key] = mergeDeepValue(result[key], value);
     }
     return result;
+}
+
+function mergeDeepValue(current: unknown, extension: unknown): unknown {
+    if (isDeferred(current) || isDeferred(extension)) {
+        return deferred(() => {
+            const cur = isDeferred(current) ? current.fn() : current;
+            const ext = isDeferred(extension) ? extension.fn() : extension;
+
+            if (isPromiseLike(cur) || isPromiseLike(ext)) {
+                return Promise.all([cur, ext]).then(([c, e]) => mergeDeepValue(c, e));
+            }
+
+            return mergeDeepValue(cur, ext);
+        });
+    }
+
+    const curIsArr = isArrayLike(current);
+    const extIsArr = isArrayLike(extension);
+    if (curIsArr || extIsArr) {
+        if (!curIsArr || !extIsArr) {
+            throw new Error('Type mismatch in deep merge: cannot merge array with non-array');
+        }
+        const curSegs = toSegments(current);
+        const extSegs = toSegments(extension);
+        return { __type: 'order-list', segments: [...curSegs, ...extSegs] } as OrderedList;
+    }
+
+    if (isPlainObject(current) && isPlainObject(extension)) {
+        return deepMerge(current, extension);
+    }
+    return extension;
+}
+
+function isPromiseLike<T = unknown>(value: unknown): value is PromiseLike<T> {
+    return (
+        typeof value === 'object' &&
+        value !== null &&
+        'then' in value &&
+        typeof (value as { then?: unknown }).then === 'function'
+    );
 }
 
 // ─── Ordered Array Helpers ──────────────────────────────────────────
@@ -109,13 +143,6 @@ export interface ModuleMergeOptions {
      */
     uniqueKeyFields?: string[];
 
-    /**
-     * Prefix for metadata keys. Keys starting with this prefix use
-     * last-writer-wins semantics and are excluded by `cleanup()`.
-     *
-     * @default '_'
-     */
-    metadataPrefix?: string;
 }
 
 // ─── Factory ────────────────────────────────────────────────────────
@@ -123,7 +150,7 @@ export interface ModuleMergeOptions {
 /**
  * Create a module merge function with the given options.
  *
- * The merge strategy handles four kinds of values:
+ * The merge strategy handles three kinds of values:
  *
  * 1. **Arrays** — collected as ordered segments, flattened by sort order
  *    after all overlays merge. Use `mkBefore`, `mkAfter`, `mkOrder` to
@@ -138,15 +165,11 @@ export interface ModuleMergeOptions {
  *    - Different priorities → lower number wins
  *    - Use `mkForce` (50), bare value (100), `mkDefault` (1000)
  *
- * 4. **Metadata** — keys starting with `metadataPrefix` use
- *    last-writer-wins and skip ordered list collection.
- *
  * @param options - configuration for the merge behavior
  * @returns A `MergeFn` suitable for `applyOverlays`
  */
 export function createModuleMerge(options?: ModuleMergeOptions): MergeFn {
     const uniqueKeyFields = new Set(options?.uniqueKeyFields ?? []);
-    const metadataPrefix = options?.metadataPrefix ?? '_';
 
     const merge: MergeFn = (current, extension) => {
         const result: Record<string, unknown> = { ...current };
@@ -154,11 +177,9 @@ export function createModuleMerge(options?: ModuleMergeOptions): MergeFn {
         for (const [key, extRaw] of Object.entries(extension)) {
             if (extRaw === undefined) continue;
 
-            const isMeta = key.startsWith(metadataPrefix);
-
             // New key
             if (!(key in result) || result[key] === undefined) {
-                if (!isMeta && isArrayLike(extRaw)) {
+                if (isArrayLike(extRaw)) {
                     result[key] = { __type: 'order-list', segments: toSegments(extRaw) } as OrderedList;
                 } else {
                     result[key] = extRaw;
@@ -170,12 +191,6 @@ export function createModuleMerge(options?: ModuleMergeOptions): MergeFn {
 
             // Deferred values: keep extension for later resolution
             if (isDeferred(extRaw)) {
-                result[key] = extRaw;
-                continue;
-            }
-
-            // Metadata keys: later wins
-            if (isMeta) {
                 result[key] = extRaw;
                 continue;
             }
@@ -250,7 +265,7 @@ export function createModuleMerge(options?: ModuleMergeOptions): MergeFn {
 }
 
 /**
- * Default module merge — no unique-key fields, `_` metadata prefix.
+ * Default module merge — no unique-key fields.
  *
  * Suitable for most configuration merging use cases.
  */

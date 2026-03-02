@@ -8,6 +8,45 @@ import { isOrdered, isOrderedList } from './order.js';
 import type { OrderedList } from './types.js';
 
 /**
+ * Normalize a merged config for safe `final` / `config` access inside deferred
+ * resolvers, without evaluating deferred values.
+ *
+ * This unwraps priority wrappers and flattens ordered lists into plain arrays,
+ * while leaving `deferred()` wrappers intact.
+ */
+export function normalizeFinal(obj: unknown, visited: WeakSet<object> = new WeakSet()): unknown {
+    if (obj === null || obj === undefined) return obj;
+
+    if (isOverride(obj)) {
+        return normalizeFinal(obj.value, visited);
+    }
+    if (isDeferred(obj)) {
+        return obj;
+    }
+    if (isOrderedList(obj)) {
+        return flattenOrderedListShallow(obj, visited);
+    }
+    if (isOrdered(obj)) {
+        return normalizeFinal(obj.items, visited);
+    }
+
+    if (typeof obj !== 'object') return obj;
+    if (obj instanceof RegExp || obj instanceof Date) return obj;
+    if (visited.has(obj)) return obj; // prevent infinite loops
+    visited.add(obj);
+
+    if (Array.isArray(obj)) {
+        return obj.map((item) => normalizeFinal(item, visited));
+    }
+
+    const normalized: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+        normalized[key] = normalizeFinal(value, visited);
+    }
+    return normalized;
+}
+
+/**
  * Recursively resolve all deferred values, unwrap priority wrappers,
  * and flatten ordered lists into plain arrays.
  */
@@ -98,6 +137,20 @@ function flattenOrderedList(orderedList: OrderedList, visited: WeakSet<object>):
             items.push(...resolved);
         } else if (resolved !== null && resolved !== undefined) {
             items.push(resolved);
+        }
+    }
+    return items;
+}
+
+function flattenOrderedListShallow(orderedList: OrderedList, visited: WeakSet<object>): unknown[] {
+    const sorted = [...orderedList.segments].sort((a, b) => a.order - b.order);
+    const items: unknown[] = [];
+    for (const seg of sorted) {
+        const normalized = normalizeFinal(seg.items, visited);
+        if (Array.isArray(normalized)) {
+            items.push(...normalized);
+        } else if (normalized !== null && normalized !== undefined) {
+            items.push(normalized);
         }
     }
     return items;

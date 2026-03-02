@@ -11,6 +11,9 @@ export type {
     OverlayFn,
     AsyncOverlayFn,
     ApplyOverlaysOptions,
+    ModuleFn,
+    AsyncModuleFn,
+    EvalModulesOptions,
 } from './types.js';
 
 export type { ModuleMergeOptions } from './module-merge.js';
@@ -55,6 +58,12 @@ export {
     composeManyExtensions,
     makeExtensible,
 } from './overlay.js';
+
+// Module evaluation (Nix module-system-style)
+export {
+    evalModules,
+    evalModulesAsync,
+} from './modules.js';
 
 // Module merge (Nix module-system-style configuration merging)
 export {

@@ -27,6 +27,7 @@ API 参考文档可通过 `pnpm docs` 自动生成至 `docs/api/`。
   - [合并策略](#合并策略)
   - [createModuleMerge 自定义选项](#createmodulemarge-自定义选项)
   - [cleanup](#cleanup)
+- [模块系统 evalModules](#模块系统-evalmodules)
 - [其他工具函数](#其他工具函数)
 - [完整 API 一览](#完整-api-一览)
 
@@ -381,6 +382,39 @@ const final = cleanup(merged);
 
 ---
 
+## 模块系统 evalModules
+
+`evalModules` 提供更接近 NixOS module 的使用方式：每个 module 的定义为 `(config) => Record<string, unknown>`，返回的配置片段会用 `moduleMerge` 合并，并在最后统一求值（`resolveDeferred`）。
+
+模块可以返回一个特殊字段 `_imports`（module 列表），用于引入其它模块一并求值；该字段不会出现在最终结果中。
+
+注意：与 `applyOverlays` 的 `final` 一样，module 执行阶段不能直接读取 `config`，需要用 `deferred(() => config.xxx)` 延迟到合并完成后访问。
+
+```ts
+import { evalModules, deferred } from 'libmodule';
+
+const base = () => ({
+  port: 7890,
+  rules: ['a'],
+});
+
+const extra = () => ({
+  rules: ['b'],
+});
+
+const root = (config) => ({
+  _imports: [extra],
+  summary: deferred(() => `rules: ${(config.rules as string[]).join(',')}`),
+});
+
+const final = evalModules({}, [base, root]);
+console.log(final.summary); // 'rules: a,b'
+```
+
+需要 async 时使用 `evalModulesAsync`：module 可以是 `async` 函数，且 `deferred` resolver 可以返回 `Promise`。
+
+---
+
 ## 其他工具函数
 
 ### makeExtensible
@@ -421,12 +455,15 @@ console.log(extended.port); // 8081
 ```ts
 type MergeFn = (current: Record<string, unknown>, extension: Record<string, unknown>) => Record<string, unknown>
 type OverlayFn = (final: Record<string, unknown>, prev: Record<string, unknown>) => Record<string, unknown>
+type ModuleFn = (config: Record<string, unknown>) => Record<string, unknown>
+type AsyncModuleFn = (config: Record<string, unknown>) => Record<string, unknown> | Promise<Record<string, unknown>>
 
 interface Deferred<T>       // 延迟值
 interface Override<T>       // 优先级包装
 interface Ordered<T>        // 排序包装
 interface OrderedList<T>    // 有序列表（合并中间态）
 interface ApplyOverlaysOptions  // applyOverlays 选项
+interface EvalModulesOptions    // evalModules 选项
 interface ModuleMergeOptions    // createModuleMerge 选项
 ```
 
@@ -447,6 +484,8 @@ AFTER_ORDER         // 1500
 ```ts
 // Overlay 核心
 applyOverlays(base, overlays, options?)
+evalModules(base, modules, options?)
+evalModulesAsync(base, modules, options?)
 makeExtensible(base, overlays?)
 extends_(overlay, baseFunc)
 composeManyExtensions(overlays)
@@ -455,6 +494,7 @@ composeManyExtensions(overlays)
 deferred(fn)
 isDeferred(val)
 resolveDeferred(obj)
+resolveDeferredAsync(obj)
 
 // 优先级
 mkOverride(priority, value)

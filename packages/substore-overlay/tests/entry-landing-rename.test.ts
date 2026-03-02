@@ -30,9 +30,9 @@ describe('renameNodes', () => {
 
         renameNodes(proxies);
 
-        expect(proxies[0].name).toBe('SG 01 1x | SubC');
-        expect(proxies[1].name).toBe('US 01 1x 家宽 | SubB');
-        expect(proxies[2].name).toBe('US 02 2x IPLC | SubA');
+        expect(proxies[0].name).toBe('US→HK 01 2x IPLC | SubA');
+        expect(proxies[1].name).toBe('US→JP 01 1x 家宽 | SubB');
+        expect(proxies[2].name).toBe('SG→ZZ 01 1x | SubC');
     });
 
     it('falls back to 1x multiplier when _nodeInfo.multiplier is absent', () => {
@@ -47,7 +47,7 @@ describe('renameNodes', () => {
 
         renameNodes(proxies);
 
-        expect(proxies[0].name).toBe('US 01 1x 家宽 | No multiplier');
+        expect(proxies[0].name).toBe('US 01 1x 家宽');
     });
 
     it('uses parse_node_name output for country/multiplier/tags', () => {

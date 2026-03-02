@@ -1,0 +1,186 @@
+{
+    "system": [
+        "You are a professional SVG icon generator for Clash/Mihomo proxy group icons.",
+        "Output exactly ONE standalone SVG document and nothing else (no markdown, no code fences, no explanations).",
+        "",
+        "Canvas & size:",
+        "- SVG root MUST be: <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"64\" height=\"64\" viewBox=\"0 0 64 64\" fill=\"none\">",
+        "- The icon MUST be square and readable at 24–32px.",
+        "",
+        "Style:",
+        "- Flat, modern, minimal, geometric.",
+        "- Use a rounded-square background: <rect x=\"2\" y=\"2\" width=\"60\" height=\"60\" rx=\"14\"/>",
+        "- Fill the background with a subtle linear gradient using the provided start/end colors.",
+        "- Add a subtle border stroke (white, ~12% opacity, stroke-width 2).",
+        "- Foreground pictogram uses ONLY white (#FFFFFF) with bold strokes: stroke-width 4, stroke-linecap round, stroke-linejoin round.",
+        "- Keep the pictogram centered with comfortable padding; avoid tiny details.",
+        "",
+        "Constraints (hard):",
+        "- NO text, letters, numbers, emojis.",
+        "- NO raster images, external links, embedded fonts.",
+        "- NO filters/blur/shadows, no masks/clipPath.",
+        "- Use only basic SVG elements (rect, path, circle, line, polyline) and simple <defs> for the gradient."
+    ],
+    "icons": [
+        {
+            "name": "manual-select",
+            "label": "手动选择",
+            "prompt": [
+                "Theme: 手动选择 (Manual selector / global mode picker).",
+                "Background gradient: start #7C3AED, end #4F46E5.",
+                "Pictogram: a clean 'sliders/control panel' symbol: three horizontal slider tracks stacked vertically, each with a circular knob at a different x-position.",
+                "Optional: add a small cursor-pointer triangle aiming at one knob to hint manual selection, but keep it minimal."
+            ]
+        },
+        {
+            "name": "latency-test",
+            "label": "延迟测试",
+            "prompt": [
+                "Theme: 延迟测试 (Latency / ping test).",
+                "Background gradient: start #06B6D4, end #3B82F6.",
+                "Pictogram: a stopwatch icon (circle with a small top button) with a simple hand/needle.",
+                "Add 2–3 small signal/pulse arcs or a short waveform line beside it to suggest network latency testing."
+            ]
+        },
+        {
+            "name": "load-balance",
+            "label": "负载均衡",
+            "prompt": [
+                "Theme: 负载均衡 (Load balancing).",
+                "Background gradient: start #22C55E, end #16A34A.",
+                "Pictogram: a central hub circle with three evenly spaced branches/arrows going to three identical endpoint circles, showing equal distribution.",
+                "Make it symmetric and obviously 'balanced' at small size."
+            ]
+        },
+        {
+            "name": "exit-node",
+            "label": "落地节点",
+            "prompt": [
+                "Theme: 落地节点 (Exit / final hop node in a proxy chain).",
+                "Background gradient: start #F59E0B, end #F97316.",
+                "Pictogram: a 'route to destination' symbol: a curved path with 2 small intermediate dots leading to a final destination marker on the right (a small flag or location pin).",
+                "Add a subtle arrowhead on the path direction to emphasize 'final egress'."
+            ]
+        },
+        {
+            "name": "entry-node",
+            "label": "落地前置",
+            "prompt": [
+                "Theme: 落地前置 (Entry / first hop node in a proxy chain).",
+                "Background gradient: start #0EA5E9, end #2563EB.",
+                "Pictogram: a 'gateway/entry' symbol: a simple portal/tunnel frame (rounded rectangle) with an arrow entering it from the left.",
+                "Optional: inside/behind the portal, show 1–2 small connected dots to hint the chain continues after entry."
+            ]
+        },
+        {
+            "name": "foreign-ai",
+            "label": "国外 AI",
+            "prompt": [
+                "Theme: 国外 AI (Overseas AI services).",
+                "Background gradient: start #EC4899, end #8B5CF6.",
+                "Pictogram: a microchip (rounded square chip with short pins) with a simple neural/circuit pattern inside (2–4 nodes connected).",
+                "Add a small globe or sparkle/star in a corner to hint 'overseas'. No letters like 'AI'."
+            ]
+        },
+        {
+            "name": "campus-net",
+            "label": "校园网",
+            "prompt": [
+                "Theme: 校园网 (Campus network).",
+                "Background gradient: start #14B8A6, end #0EA5E9.",
+                "Pictogram: a simplified university building (roof + 3 pillars) or a campus gate silhouette.",
+                "Add small Wi‑Fi arcs above the building to indicate campus network access."
+            ]
+        },
+        {
+            "name": "academic-sites",
+            "label": "学术网站",
+            "prompt": [
+                "Theme: 学术网站 (Academic / research websites).",
+                "Background gradient: start #6366F1, end #1D4ED8.",
+                "Pictogram: an open book icon with a bookmark line.",
+                "Overlay a small magnifying glass (search) on one page to suggest research/academic lookup."
+            ]
+        },
+        {
+            "name": "gaming",
+            "label": "游戏平台",
+            "prompt": [
+                "Theme: 游戏平台 (Gaming platforms).",
+                "Background gradient: start #EF4444, end #F97316.",
+                "Pictogram: a game controller (rounded shape) with a D‑pad cross on the left and 2 small buttons on the right.",
+                "Keep it chunky and readable."
+            ]
+        },
+        {
+            "name": "streaming",
+            "label": "流媒体",
+            "prompt": [
+                "Theme: 流媒体 (Streaming media).",
+                "Background gradient: start #F43F5E, end #A855F7.",
+                "Pictogram: a screen/rectangle with rounded corners and a play triangle in the center.",
+                "Optional: add 1–2 small sound/wave lines to hint video/audio streaming."
+            ]
+        },
+        {
+            "name": "torrent-tracker",
+            "label": "种子 tracker",
+            "prompt": [
+                "Theme: 种子 tracker (Torrent tracker / peers).",
+                "Background gradient: start #CA8A04, end #F59E0B.",
+                "Pictogram: a classic U‑shaped magnet with two small end caps.",
+                "Add 3 small dots (peers) connected by short lines or arranged in a ring around the magnet to imply tracking/peer discovery."
+            ]
+        },
+        {
+            "name": "foreign-proxy",
+            "label": "国外代理",
+            "prompt": [
+                "Theme: 国外代理 (Overseas proxy).",
+                "Background gradient: start #3B82F6, end #22C55E.",
+                "Pictogram: a globe (circle with 1–2 meridian/latitude lines).",
+                "Wrap it with two curved arrows (routing loop) to indicate proxying traffic internationally."
+            ]
+        },
+        {
+            "name": "direct-cn",
+            "label": "国内直连",
+            "prompt": [
+                "Theme: 国内直连 (Direct connection, no proxy).",
+                "Background gradient: start #10B981, end #84CC16.",
+                "Pictogram: a simple house/home icon.",
+                "Add a single straight arrow that goes directly to the home (no intermediate nodes), emphasizing 'direct'."
+            ]
+        },
+        {
+            "name": "private-net",
+            "label": "私有网络",
+            "prompt": [
+                "Theme: 私有网络 (Private network / intranet).",
+                "Background gradient: start #64748B, end #334155.",
+                "Pictogram: a padlock icon in front of a small 3‑node network graph (three dots connected).",
+                "Make the lock the primary element to convey privacy/security."
+            ]
+        },
+        {
+            "name": "ads",
+            "label": "广告",
+            "prompt": [
+                "Theme: 广告 (Ads / ad blocking).",
+                "Background gradient: start #FBBF24, end #EF4444.",
+                "Pictogram: a megaphone/bullhorn icon.",
+                "Overlay a bold diagonal 'prohibited' slash across it to indicate blocking."
+            ]
+        },
+        {
+            "name": "catch-all",
+            "label": "漏网之鱼",
+            "prompt": [
+                "Theme: 漏网之鱼 (Catch‑all / fallback traffic not matched).",
+                "Background gradient: start #111827, end #374151.",
+                "Pictogram: a fishing net (simple diamond grid) with a fish silhouette partly outside the net, implying 'escaped the net'.",
+                "Keep it simple and iconic; no fine mesh details."
+            ]
+        }
+    ]
+}

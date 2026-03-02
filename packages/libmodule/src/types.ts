@@ -67,3 +67,18 @@ export type AsyncOverlayFn = (
 export interface ApplyOverlaysOptions {
     merge?: MergeFn;
 }
+
+// ─── Module System ─────────────────────────────────────────────────
+
+/** Module function: receives final merged config, returns a config fragment. */
+export type ModuleFn = (config: Record<string, unknown>) => Record<string, unknown>;
+
+/** Async module function: may return Promise. */
+export type AsyncModuleFn = (
+    config: Record<string, unknown>,
+) => Record<string, unknown> | Promise<Record<string, unknown>>;
+
+/** Options for evalModules / evalModulesAsync. */
+export interface EvalModulesOptions {
+    merge?: MergeFn;
+}

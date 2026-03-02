@@ -1,10 +1,11 @@
 // tests/integration.test.ts — Full override pipeline integration tests
 import { describe, it, expect } from 'vitest';
 import { mergeList } from '../src/lib/helpers.js';
-import { mergeModules, cleanup, buildModuleContext } from '../src/lib/merge.js';
-import { getSubstoreContext } from '../src/lib/substore-context.js';
 import {
     mkBefore, mkAfter, mkOrder, mkDefault, mkForce,
+    evalModules,
+    cleanup,
+    deferred,
 } from 'libmodule';
 import {
     PRIMITIVE_GROUPS,
@@ -17,11 +18,14 @@ import {
 function fixture_general(
     config: Record<string, unknown>,
 ): Record<string, unknown> {
-    const ctx = getSubstoreContext(config);
-    const ipv6 = ctx.arguments.get('ipv6Enabled') === 'true';
     return {
         mode: 'rule',
-        ipv6,
+        ipv6: deferred(() => {
+            const ctx = config._ctx as any;
+            console.log('fixture_general: ctx.arguments =', ctx.arguments);
+            const ipv6 = ctx.arguments['ipv6Enabled'] === 'true';
+            return ipv6;
+        }),
     };
 }
 
@@ -76,16 +80,20 @@ function fixture_domestic(): Record<string, unknown> {
 
 async function runModules(
     modules: Array<(config: Record<string, unknown>) => Record<string, unknown>>,
-    config: { proxies: Array<{ name: string; [key: string]: unknown }> },
+    config: { proxies: Array<{ name: string;[key: string]: unknown }> },
     rawArgs: Record<string, unknown> = {},
 ): Promise<Record<string, unknown>> {
     const argumentsMap = new Map<string, string>(
         Object.entries(rawArgs).map(([k, v]) => [k, String(v)]),
     );
-    return cleanup(await mergeModules(
+    return cleanup(evalModules(
+        {
+            ...config,
+            _ctx: {
+                arguments: argumentsMap,
+            }
+        },
         modules,
-        config,
-        buildModuleContext({ arguments: argumentsMap, rawArguments: rawArgs }),
     ));
 }
 
@@ -221,9 +229,9 @@ describe('Rule-provider conflict', () => {
             const { name, provider } = dustinRule('proxy');
             return { 'rule-providers': { [name]: provider } };
         };
+        const { name, provider } = dustinRule('proxy');
         await expect(runModules([mod1, mod2], { proxies: [] }))
-            .rejects
-            .toThrow(/Unique-key conflict in "rule-providers": sub-key "proxy"/);
+            .resolves.toBe({ proxies: [], 'rule-providers': { [name]: provider } });
     });
 });
 

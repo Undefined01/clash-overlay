@@ -1,10 +1,9 @@
 import type { ProxyNode, ScriptOperator } from '../types/substore.js';
-import { getNodeSubscriptionName } from '../lib/substore-context.js';
 import type {
     GeoInfo,
     NodeInfo,
 } from '../lib/proxy-processor/types.js';
-import { normalizeCountryCode } from '../lib/proxy-processor/country.js';
+import { SubscriptionNodeInfo } from '../lib/substore-context.js';
 
 /**
  * `rename_nodes` operator.
@@ -20,6 +19,7 @@ import { normalizeCountryCode } from '../lib/proxy-processor/country.js';
 export interface RenameInputProxy {
     name: string;
     _geoEntry?: Partial<Pick<GeoInfo, 'countryCode'>>;
+    _geoLanding?: Partial<Pick<GeoInfo, 'countryCode'>>;
     _nodeInfo?: NodeInfo;
 }
 
@@ -29,6 +29,7 @@ interface RenameRow<TProxy> {
     proxy: TProxy;
     originName: string;
     countryCode: string;
+    landingCountryCode: string;
     multiplier: number;
     tags: string[];
     source: string;
@@ -56,15 +57,17 @@ export function renameNodes<TProxy extends RenameInputProxy>(
 
 function applyRename<TProxy extends RenameInputProxy>(rows: RenameRow<TProxy>[]): void {
     rows.sort((a, b) => {
-        if (a.countryCode !== b.countryCode) return a.countryCode.localeCompare(b.countryCode);
+        const aCode = a.landingCountryCode + a.countryCode;
+        const bCode = b.landingCountryCode + b.countryCode;
+        if (aCode !== bCode) return aCode.localeCompare(bCode);
         if (a.multiplier !== b.multiplier) return a.multiplier - b.multiplier;
         return a.originName.localeCompare(b.originName);
     });
 
     const counter = new Map<string, number>();
     for (const row of rows) {
-        const next = (counter.get(row.countryCode) || 0) + 1;
-        counter.set(row.countryCode, next);
+        const next = (counter.get(row.landingCountryCode) || 0) + 1;
+        counter.set(row.landingCountryCode, next);
 
         const routePrefix = row.countryCode;
         const number = String(next).padStart(2, '0');
@@ -76,21 +79,29 @@ function applyRename<TProxy extends RenameInputProxy>(rows: RenameRow<TProxy>[])
     }
 }
 
-function buildRenameRow<TProxy extends RenameInputProxy>(
+function buildRenameRow<TProxy extends RenameInputProxy & SubscriptionNodeInfo>(
     proxy: TProxy,
 ): RenameRow<TProxy> {
     const originName = proxy.name;
-    const countryCode = normalizeCountryCode(proxy._geoEntry?.countryCode ?? proxy._nodeInfo?.countryCode);
+    const fallback = (countryCode: string | undefined, fallbackCode: string): string => {
+        return countryCode && countryCode !== 'ZZ' ? countryCode : fallbackCode;
+    }
+    const entryCountryCode = fallback(proxy._geoEntry?.countryCode, proxy._nodeInfo?.countryCode ?? 'ZZ');
+    const nodeCountryCode = fallback(proxy._geoLanding?.countryCode, proxy._nodeInfo?.countryCode ?? 'ZZ');
+    let countryCodes = [entryCountryCode, nodeCountryCode];
+    if (entryCountryCode === nodeCountryCode) {
+        countryCodes = [entryCountryCode];
+    }
+    const countryCode = countryCodes.join('→');
     const multiplier = resolveMultiplier(proxy._nodeInfo?.multiplier);
     const tags = resolveTags(proxy._nodeInfo?.tags);
-    const source = getNodeSubscriptionName(proxy, {
-        includeCollectionName: false,
-    });
+    const source = proxy._subDisplayName || proxy._subName || '';
 
     return {
         proxy,
         originName,
         countryCode,
+        landingCountryCode: countryCodes[countryCodes.length - 1],
         multiplier,
         tags,
         source,

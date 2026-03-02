@@ -11,7 +11,7 @@
 //   - `prev`: the accumulated state from all previous overlays (immediately available)
 //   - `final`: the state after ALL overlays are applied (lazy, use in deferred/getters)
 
-import { resolveDeferred, resolveDeferredAsync } from './resolve.js';
+import { normalizeFinal, resolveDeferred, resolveDeferredAsync } from './resolve.js';
 import type { OverlayFn, AsyncOverlayFn, ApplyOverlaysOptions } from './types.js';
 
 /**
@@ -81,7 +81,7 @@ export function applyOverlays(
     }
 
     // Phase 2: Resolve deferred values
-    finalResolved = current;
+    finalResolved = normalizeFinal(current) as Record<string, unknown>;
     const resolved = resolveDeferred(current) as Record<string, unknown>;
     finalResolved = resolved; // update for any nested deferred that reference final
 
@@ -139,7 +139,7 @@ export async function applyOverlaysAsync(
         current = merge(current, ext);
     }
 
-    finalResolved = current;
+    finalResolved = normalizeFinal(current) as Record<string, unknown>;
     const resolved = await resolveDeferredAsync(current) as Record<string, unknown>;
     finalResolved = resolved;
 

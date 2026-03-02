@@ -1,8 +1,6 @@
 import type { BaseProxy } from './types.js';
 import { isRecord } from './runtime.js';
 
-const dayMs = 24 * 60 * 60 * 1000;
-
 export interface GeoPairCacheValue {
     entry: {
         countryCode: string;
@@ -11,10 +9,6 @@ export interface GeoPairCacheValue {
         countryCode: string;
     };
     checkedAt: number;
-}
-
-export function defaultCacheTtlMs(): number {
-    return dayMs;
 }
 
 export function readCache(id: string): Record<string, unknown> | string | null {

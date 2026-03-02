@@ -58,24 +58,32 @@ export async function executeAsyncTasks<T>(
 
     const maxWorkers = Math.max(1, Math.min(concurrency, tasks.length));
     let cursor = 0;
+    let results = new Array<T>(tasks.length);
+    let last_finished_time = Date.now();
     if (logDebug) {
         logDebug('executeAsyncTasks start', { taskCount: tasks.length, maxWorkers });
     }
 
-    async function worker(): Promise<T | undefined> {
+    async function worker(): Promise<void> {
         while (true) {
             const index = cursor;
             cursor += 1;
             if (index >= tasks.length) return;
-            return await tasks[index]();
+            const now = Date.now();
+            if (now - last_finished_time < 100) {
+                await wait(100 - (now - last_finished_time));
+            }
+            const result = await tasks[index]();
+            results[index] = result;
+            last_finished_time = Date.now();
         }
     }
 
-    const results = await Promise.all(Array.from({ length: maxWorkers }, () => worker()));
+    await Promise.all(Array.from({ length: maxWorkers }, () => worker()));
     if (logDebug) {
         logDebug('executeAsyncTasks completed', { taskCount: tasks.length });
     }
-    return results.filter((r) => r !== undefined);
+    return results as Array<T>;
 }
 
 export function safeJsonParse<T>(text: string): T | null {

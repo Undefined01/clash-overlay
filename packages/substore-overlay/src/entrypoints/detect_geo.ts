@@ -1,48 +1,49 @@
 import * as v from 'valibot';
 import type { ProxyNode, ScriptOperator, TargetPlatform } from '../types/substore.js';
 import { booleanArgSchema, positiveIntSchema } from '../lib/args.js';
-import { normalizeCountryCode } from '../lib/proxy-processor/country.js';
+import { normalizeCountryCode, resolveIp } from '../lib/proxy-processor/country.js';
 import {
     buildGeoPairCacheId,
-    defaultCacheTtlMs,
     readCache,
     writeCache,
 } from '../lib/proxy-processor/cache.js';
 import {
+    createDebugLogger,
     executeAsyncTasks,
     isRecord,
     safeJsonParse,
+    toErrorMessage,
     withRetry,
 } from '../lib/proxy-processor/runtime.js';
 import type { GeoInfo, LandingGeoInfo } from '../lib/proxy-processor/types.js';
 
-const IP_API_ENTRY_TEMPLATE = 'http://ip-api.com/json/{{host}}?fields=status,countryCode';
-const IP_API_LANDING = 'http://ip-api.com/json?fields=status,countryCode';
+const IP_API_ENTRY_TEMPLATE = 'http://ip-api.com/json/{{host}}';
+const IP_API_LANDING = 'http://ip-api.com/json';
 const DOH_API = 'https://1.1.1.1/dns-query';
+const EDNS_CLIENT_SUBNET = '223.6.6.6';
 
 const HTTP_TIMEOUT_MS = 5000;
 const RETRIES = 1;
 const RETRY_DELAY_MS = 800;
 
-const entryDetectionModeSchema = v.fallback(
-    v.pipe(
-        v.string(),
-        v.transform((s) => s.trim()),
-        v.transform((s) => {
-            const lower = s.toLowerCase();
-            if (lower === 'mmdb') return 'MMDB';
-            if (lower === 'ip-api' || lower === 'ip_api' || lower === 'ipapi') return 'ip-api';
-            return s;
-        }),
-        v.picklist(['MMDB', 'ip-api'] as const),
-    ),
-    'ip-api',
+const SUCCEEDED_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 1 day
+const FAILED_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+enum entryDetectionMode {
+    MMDB = 'MMDB',
+    IP_API = 'ip-api',
+}
+
+const entryDetectionModeSchema = v.pipe(
+    v.string(),
+    v.picklist(Object.values(entryDetectionMode)),
 );
 
 const detectGeoArgsSchema = v.looseObject({
     cache: v.optional(booleanArgSchema, true),
     concurrency: v.optional(positiveIntSchema, 10),
-    entry_detection_mode: v.optional(entryDetectionModeSchema, 'ip-api'),
+    entry_detection_mode: v.optional(entryDetectionModeSchema, entryDetectionMode.IP_API),
+    debug: v.optional(booleanArgSchema, false),
 });
 
 /**
@@ -57,6 +58,9 @@ const detectGeoArgsSchema = v.looseObject({
  *   - `'MMDB'`: `ProxyUtils.doh` -> `ProxyUtils.MMDB().geoip(ip)`
  *   - `'ip-api'`: `http://ip-api.com/json/{host}?fields=status,countryCode`
  *   - Default: `'ip-api'`
+ * - `debug`: `bool`
+ *   - Default: `false`
+ *   - When `true`, prints detailed debug logs for cache, network requests, and parsing results.
  */
 export type DetectGeoArgs = v.InferOutput<typeof detectGeoArgsSchema>;
 
@@ -73,13 +77,30 @@ export type DetectGeoOutputProxy = ProxyNode & DetectGeoInputProxy & DetectGeoPa
 
 const operator: ScriptOperator<ProxyNode & DetectGeoInputProxy, DetectGeoOutputProxy> = async (proxies, _targetPlatform, _context) => {
     const args = v.parse(detectGeoArgsSchema, typeof $arguments !== 'undefined' ? $arguments : {});
-    const entryDetector: GeoDetector = args.entry_detection_mode === 'MMDB' ? new MMDBGeoDetector() : new IpApiGeoDetector();
-    const landingDetector: LandingGeoDetector = new SubStoreSurgeGeoDetector();
-
-    const tasks = proxies.map(proxy => async () => {
-        return await detectOneProxy(proxy, args, entryDetector, landingDetector);
+    const logDebug = createDebugLogger('detect_geo', args.debug);
+    logDebug('operator start', {
+        proxyCount: Array.isArray(proxies) ? proxies.length : -1,
+        targetPlatform: _targetPlatform,
+        cache: args.cache,
+        concurrency: args.concurrency,
+        entry_detection_mode: args.entry_detection_mode,
+        runtimeEnv: typeof $substore === 'undefined' ? null : {
+            isNode: $substore.env?.isNode,
+            isSurge: $substore.env?.isSurge,
+            isLoon: $substore.env?.isLoon,
+            isQX: $substore.env?.isQX,
+        },
     });
-    const results = await executeAsyncTasks(tasks, args.concurrency);
+
+    const entryDetector: GeoDetector = args.entry_detection_mode === 'MMDB'
+        ? new MMDBGeoDetector(logDebug)
+        : new IpApiGeoDetector(logDebug);
+    const landingDetector: LandingGeoDetector = new SubStoreSurgeGeoDetector(logDebug);
+
+    const tasks = proxies.map((proxy, index) => async () => {
+        return await detectOneProxy(proxy, index, args, entryDetector, landingDetector, logDebug);
+    });
+    const results = await executeAsyncTasks(tasks, args.concurrency, logDebug);
     return results;
 };
 
@@ -90,67 +111,67 @@ interface GeoDetector {
 }
 
 class MMDBGeoDetector implements GeoDetector {
+    constructor(private readonly logDebug?: (message: string, detail?: object) => void) {}
+
     async detect(host: string): Promise<{ countryCode: string }> {
-        const ip = await this.resolveIp(host);
+        const ip = await resolveIp(host, DOH_API, HTTP_TIMEOUT_MS, EDNS_CLIENT_SUBNET, RETRIES, RETRY_DELAY_MS, this.logDebug);
+        this.logDebug?.('MMDB detect resolved ip', { host, ip });
         if (!ip) return { countryCode: 'ZZ' };
         if (typeof ProxyUtils === 'undefined' || !ProxyUtils || typeof ProxyUtils.MMDB !== 'function') {
+            this.logDebug?.('MMDB detect missing ProxyUtils.MMDB', {
+                hasProxyUtils: typeof ProxyUtils !== 'undefined' && !!ProxyUtils,
+                MMDBType: typeof (typeof ProxyUtils === 'undefined' ? undefined : (ProxyUtils as Record<string, unknown>).MMDB),
+            });
             return { countryCode: 'ZZ' };
         }
 
         const mmdb = new ProxyUtils.MMDB();
         const iso = mmdb.geoip(ip);
+        this.logDebug?.('MMDB detect geoip result', { ip, iso });
         return { countryCode: normalizeCountryCode(iso) };
-    }
-
-    private async resolveIp(host: string): Promise<string> {
-        const value = String(host || '').trim();
-        if (!value) return '';
-        if (typeof ProxyUtils !== 'undefined' && ProxyUtils && typeof ProxyUtils.isIP === 'function' && ProxyUtils.isIP(value)) {
-            return value;
-        }
-        if (typeof ProxyUtils === 'undefined' || !ProxyUtils || typeof ProxyUtils.doh !== 'function') {
-            return '';
-        }
-
-        const packet = await withRetry(
-            () => ProxyUtils.doh({ url: DOH_API, domain: value, type: 'A', timeout: HTTP_TIMEOUT_MS }),
-            RETRIES,
-            RETRY_DELAY_MS,
-            undefined,
-            `doh:${value}`,
-        );
-
-        const answers = (packet && typeof packet === 'object' && 'answers' in packet ? (packet as { answers?: unknown }).answers : null) as unknown;
-        if (!Array.isArray(answers)) return '';
-        const firstA = answers.find((a) => isRecord(a) && a.type === 'A' && typeof a.data === 'string') as { data?: string } | undefined;
-        const ip = String(firstA?.data || '').trim();
-        if (typeof ProxyUtils !== 'undefined' && ProxyUtils && typeof ProxyUtils.isIP === 'function' && ProxyUtils.isIP(ip)) {
-            return ip;
-        }
-        return '';
     }
 }
 
 class IpApiGeoDetector implements GeoDetector {
+    constructor(private readonly logDebug?: (message: string, detail?: object) => void) {}
+
     async detect(host: string): Promise<{ countryCode: string }> {
         const value = String(host || '').trim();
-        if (!value) return { countryCode: 'ZZ' };
-        if (typeof $substore === 'undefined') return { countryCode: 'ZZ' };
+        if (!value) {
+            this.logDebug?.('ip-api entry skip: empty host');
+            return { countryCode: 'ZZ' };
+        }
+        if (typeof $substore === 'undefined') {
+            this.logDebug?.('ip-api entry skip: $substore is undefined');
+            return { countryCode: 'ZZ' };
+        }
 
-        const url = IP_API_ENTRY_TEMPLATE.replace(/\{\{host\}\}/g, encodeURIComponent(value));
+        const ip = await resolveIp(value, DOH_API, HTTP_TIMEOUT_MS, EDNS_CLIENT_SUBNET, RETRIES, RETRY_DELAY_MS, this.logDebug);
+        const url = IP_API_ENTRY_TEMPLATE.replace(/\{\{host\}\}/g, encodeURIComponent(ip));
+        this.logDebug?.('ip-api entry request', { host: value, url });
         const response = await withRetry(
             () => $substore.http.get({ url, timeout: HTTP_TIMEOUT_MS, headers: { accept: 'application/json' } }),
             RETRIES,
             RETRY_DELAY_MS,
-            undefined,
+            this.logDebug,
             `ip-api-entry:${value}`,
         );
 
-        const parsed = safeJsonParse<Record<string, unknown>>(response.body) || {};
+        const bodyText = toBodyText(response.body);
+        this.logDebug?.('ip-api entry response', {
+            host: value,
+            statusCode: response.statusCode,
+            bodyPreview: truncateText(bodyText, 240),
+        });
+
+        const parsed = safeJsonParse<Record<string, unknown>>(bodyText) || {};
         if (String(parsed.status || '') && String(parsed.status || '') !== 'success') {
+            this.logDebug?.('ip-api entry non-success status', { host: value, status: parsed.status, message: parsed.message });
             return { countryCode: 'ZZ' };
         }
-        return { countryCode: normalizeCountryCode(parsed.countryCode) };
+        const cc = normalizeCountryCode(parsed.countryCode);
+        this.logDebug?.('ip-api entry parsed countryCode', { host: value, countryCode: parsed.countryCode, normalized: cc });
+        return { ...parsed, countryCode: cc };
     }
 }
 
@@ -159,14 +180,31 @@ interface LandingGeoDetector {
 }
 
 class SubStoreSurgeGeoDetector implements LandingGeoDetector {
+    constructor(private readonly logDebug?: (message: string, detail?: object) => void) {}
+
     async detect(node: ProxyNode): Promise<{ countryCode: string }> {
-        if (typeof $substore === 'undefined') return { countryCode: 'ZZ' };
+        if (typeof $substore === 'undefined') {
+            this.logDebug?.('ip-api landing skip: $substore is undefined');
+            return { countryCode: 'ZZ' };
+        }
 
-        const runtimeTarget = detectRuntimeTarget();
-        if (!runtimeTarget) return { countryCode: 'ZZ' };
+        const runtimeTarget = 'sing-box';
 
-        const policyDescriptor = producePolicyDescriptor(node, runtimeTarget);
-        if (!policyDescriptor) return { countryCode: 'ZZ' };
+        const policyDescriptor = producePolicyDescriptor(node, runtimeTarget, this.logDebug);
+        if (!policyDescriptor) {
+            this.logDebug?.('ip-api landing skip: failed to produce policy descriptor', {
+                targetPlatform: runtimeTarget,
+                name: String(node.name || ''),
+                type: String((node as { type?: unknown }).type || ''),
+            });
+            return { countryCode: 'ZZ' };
+        }
+
+        this.logDebug?.('ip-api landing request', {
+            targetPlatform: runtimeTarget,
+            name: String(node.name || ''),
+            policyDescriptorLength: policyDescriptor.length,
+        });
 
         const response = await withRetry(
             () =>
@@ -179,15 +217,25 @@ class SubStoreSurgeGeoDetector implements LandingGeoDetector {
                 }),
             RETRIES,
             RETRY_DELAY_MS,
-            undefined,
+            this.logDebug,
             `ip-api-landing:${String(node.name || '')}`,
         );
 
-        const parsed = safeJsonParse<Record<string, unknown>>(response.body) || {};
+        const bodyText = toBodyText(response.body);
+        this.logDebug?.('ip-api landing response', {
+            name: String(node.name || ''),
+            statusCode: response.statusCode,
+            bodyPreview: truncateText(bodyText, 240),
+        });
+
+        const parsed = safeJsonParse<Record<string, unknown>>(bodyText) || {};
         if (String(parsed.status || '') && String(parsed.status || '') !== 'success') {
+            this.logDebug?.('ip-api landing non-success status', { status: parsed.status, message: parsed.message });
             return { countryCode: 'ZZ' };
         }
-        return { countryCode: normalizeCountryCode(parsed.countryCode) };
+        const cc = normalizeCountryCode(parsed.countryCode);
+        this.logDebug?.('ip-api landing parsed countryCode', { countryCode: parsed.countryCode, normalized: cc });
+        return { ...parsed, countryCode: cc };
     }
 }
 
@@ -195,13 +243,18 @@ export { buildGeoPairCacheId };
 
 async function detectOneProxy(
     proxy: ProxyNode & DetectGeoInputProxy,
+    index: number,
     args: DetectGeoArgs,
     entryDetector: GeoDetector,
     landingDetector: LandingGeoDetector,
+    logDebug: (message: string, detail?: object) => void,
 ): Promise<DetectGeoOutputProxy> {
-    if (typeof proxy._originName === 'undefined') {
-        proxy._originName = String(proxy.name || '');
-    }
+    logDebug('proxy start', {
+        index,
+        name: String(proxy.name || ''),
+        type: String(proxy.type || ''),
+        server: String(proxy.server || ''),
+    });
 
     const cacheId = buildGeoPairCacheId(proxy, {
         entry_detection_mode: args.entry_detection_mode,
@@ -216,21 +269,40 @@ async function detectOneProxy(
             proxy._geoEntry = cached.entry;
             proxy._geoLanding = cached.landing;
             proxy._geoCheckedAt = Number(cached.checkedAt) || Date.now();
+            logDebug('proxy cache hit', {
+                index,
+                entry: cached.entry,
+                landing: cached.landing,
+                checkedAt: proxy._geoCheckedAt,
+            });
             return proxy as DetectGeoOutputProxy;
         }
+        logDebug('proxy cache miss', { index });
     }
 
-    const entry = await entryDetector.detect(String(proxy.server || ''));
-    const landing = await landingDetector.detect(proxy);
+    let entry: { countryCode: string } = { countryCode: 'ZZ' };
+    let landing: { countryCode: string } = { countryCode: 'ZZ' };
+    try {
+        entry = await entryDetector.detect(String(proxy.server || ''));
+    } catch (error) {
+        logDebug('entry detect threw', { index, error: toErrorMessage(error) });
+    }
+    try {
+        landing = await landingDetector.detect(proxy);
+    } catch (error) {
+        logDebug('landing detect threw', { index, error: toErrorMessage(error) });
+    }
 
-    const entryGeo: GeoInfo = { countryCode: normalizeCountryCode(entry.countryCode) };
-    const landingGeo: LandingGeoInfo = { countryCode: normalizeCountryCode(landing.countryCode) };
+    const entryGeo: GeoInfo = entry;
+    const landingGeo: LandingGeoInfo = landing;
 
     proxy._geoEntry = entryGeo;
     proxy._geoLanding = landingGeo;
     proxy._geoCheckedAt = Date.now();
 
     if (args.cache) {
+        const ttl = entryGeo.countryCode === 'ZZ' ? FAILED_CACHE_TTL_MS : SUCCEEDED_CACHE_TTL_MS;
+        logDebug('proxy cache write', { index, ttl, entry: entryGeo, landing: landingGeo });
         writeCache(
             cacheId,
             {
@@ -238,21 +310,19 @@ async function detectOneProxy(
                 landing: landingGeo,
                 checkedAt: proxy._geoCheckedAt,
             },
-            defaultCacheTtlMs(),
+            ttl,
         );
     }
 
+    logDebug('proxy done', { index, entry: entryGeo, landing: landingGeo, checkedAt: proxy._geoCheckedAt });
     return proxy as DetectGeoOutputProxy;
 }
 
-function detectRuntimeTarget(): TargetPlatform | null {
-    const env = typeof $substore === 'undefined' ? null : $substore.env;
-    if (env?.isLoon) return 'Loon';
-    if (env?.isSurge) return 'Surge';
-    return null;
-}
-
-function producePolicyDescriptor(proxy: ProxyNode, targetPlatform: TargetPlatform): string | null {
+function producePolicyDescriptor(
+    proxy: ProxyNode,
+    targetPlatform: TargetPlatform,
+    logDebug?: (message: string, detail?: object) => void,
+): string | null {
     if (typeof ProxyUtils === 'undefined' || !ProxyUtils || typeof ProxyUtils.produce !== 'function') return null;
     const produced = ProxyUtils.produce([proxy], targetPlatform);
     if (typeof produced !== 'string' || !produced) return null;
@@ -261,6 +331,11 @@ function producePolicyDescriptor(proxy: ProxyNode, targetPlatform: TargetPlatfor
         .split(/[\r\n]+/)
         .map((line) => line.trim())
         .filter((line) => line.length > 0 && !line.startsWith('#!'));
+    logDebug?.('producePolicyDescriptor', {
+        targetPlatform,
+        producedLength: produced.length,
+        candidateCount: candidates.length,
+    });
     return candidates.length > 0 ? candidates[candidates.length - 1] : null;
 }
 
@@ -272,4 +347,20 @@ function isGeoPairCacheValue(value: Record<string, unknown> | string | null): va
     if (!isRecord(value)) return false;
     if (!isRecord(value.entry) || !isRecord(value.landing)) return false;
     return true;
+}
+
+function truncateText(value: string, maxLength: number): string {
+    const text = String(value ?? '');
+    if (text.length <= maxLength) return text;
+    return `${text.slice(0, Math.max(0, maxLength - 3))}...`;
+}
+
+function toBodyText(body: unknown): string {
+    if (typeof body === 'string') return body;
+    if (body === null || typeof body === 'undefined') return '';
+    try {
+        return JSON.stringify(body);
+    } catch (_error) {
+        return String(body);
+    }
 }

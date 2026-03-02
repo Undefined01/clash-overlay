@@ -4,12 +4,11 @@
 // 由 merge engine 合并，列表元素通过 mkBefore/mkAfter/mkOrder 控制位置，
 // deferred 值在合并后统一解析。
 
-import { mergeModules, cleanup, buildModuleContext } from '../lib/merge.js';
-import type { ClashModule } from '../lib/merge.js';
-import type { ProxyNode, SubStoreArguments } from '../types/substore.js';
-import { createArgumentMap } from '../lib/substore-context.js';
+import { ClashMetaConfig } from '../types/clash_meta_config.js';
+import { deferred, evalModules, ModuleFn } from 'libmodule';
 
-// ── 模块导入 ──
+import * as v from 'valibot';
+
 import generalModule from '../modules/general.js';
 import dnsModule from '../modules/dns.js';
 import baseGroupsModule from '../modules/base-groups.js';
@@ -24,48 +23,76 @@ import gamingModule from '../modules/gaming.js';
 import aiModule from '../modules/ai.js';
 import proxyModule from '../modules/proxy.js';
 
+const ModuleContextSchema = v.object({
+    arguments: v.object({
+        ipv6Enabled: v.optional(v.boolean(), false),
+        dnsMode: v.optional(v.picklist(['fake-ip', 'redir-host']), 'fake-ip'),
+    }),
+    options: v.optional(v.object({})),
+    originalConfig: v.any(),
+});
+
+type ModuleContext = v.InferOutput<typeof ModuleContextSchema>;
+
 // ── 模块注册（合并顺序 = 注册顺序，列表排序由 mkOrder 控制）──
-const modules: ClashModule[] = [
+const modules: ((context: ModuleContext) => ModuleFn)[] = [
     generalModule,       // 通用配置（标量/对象，无列表）
     dnsModule,           // DNS 配置（标量/对象，无分流规则）
     baseGroupsModule,    // 基础代理组（mkBefore = 500）
     landingProxyModule,  // 落地代理（mkOrder 600）
-    customModule,        // 自定义规则（mkOrder 650）
-    sshModule,           // SSH 端口代理（mkOrder 675）
-    privateModule,       // 私有网络 + 广告（mkOrder 700）
-    academicModule,      // 学术网站 + Trackers（mkOrder 750）
-    domesticModule,      // 国内直连（mkOrder 800）
-    streamingModule,     // 流媒体（mkOrder 850）
-    gamingModule,        // 游戏平台（mkOrder 875）
-    aiModule,            // 国外 AI（mkOrder 900）
-    proxyModule,         // 国外代理 + 漏网之鱼（mkOrder 1100 + mkAfter）
+    () => customModule,        // 自定义规则（mkOrder 650）
+    () => sshModule,           // SSH 端口代理（mkOrder 675）
+    () => privateModule,       // 私有网络 + 广告（mkOrder 700）
+    () => academicModule,      // 学术网站 + Trackers（mkOrder 750）
+    () => domesticModule,      // 国内直连（mkOrder 800）
+    () => streamingModule,     // 流媒体（mkOrder 850）
+    () => gamingModule,        // 游戏平台（mkOrder 875）
+    () => aiModule,            // 国外 AI（mkOrder 900）
+    () => proxyModule,         // 国外代理 + 漏网之鱼（mkOrder 1100 + mkAfter）
 ];
 
 // ── 入口函数 ──
-async function main(config: Record<string, unknown>): Promise<Record<string, unknown>> {
-    const rawArgs: SubStoreArguments = typeof $arguments !== 'undefined' ? $arguments : {};
-    const argumentsMap = createArgumentMap(rawArgs);
-
-    const workingConfig = config as {
-        proxies?: ProxyNode[];
-        [key: string]: unknown;
-    };
-    if (!Array.isArray(workingConfig.proxies)) workingConfig.proxies = [];
-
-    const moduleContext = buildModuleContext({
-        arguments: argumentsMap,
-        rawArguments: rawArgs,
-        options: typeof $options !== 'undefined' ? $options : undefined,
-        runtimeEnv: typeof $substore !== 'undefined' ? $substore.env : undefined,
+function main(config: ClashMetaConfig): ClashMetaConfig {
+    const ctx = v.parse(ModuleContextSchema, {
+        arguments: typeof $arguments !== 'undefined' ? $arguments : {},
+        options: typeof $options !== 'undefined' ? $options : {},
+        originalConfig: config,
     });
+    const base = {
+        _ctx: ctx,
+    };
 
-    const merged = await mergeModules(
-        modules,
-        workingConfig as { proxies: ProxyNode[] },
-        moduleContext,
+    const merged = evalModules(
+        base,
+        modules.map(fn => fn(ctx)).concat([
+            listToMap('proxy-groups', '_proxyGroupMap', item => String(item.name)),
+            listToMap('proxies', '_proxyMap', item => String(item.name)),
+        ]),
     );
 
-    return cleanup(merged);
+    merged['proxy-groups'] = Object.values(merged._proxyGroupMap as Record<string, unknown>);
+    merged.proxies = Object.values(merged._proxyMap as Record<string, unknown>);
+
+    return merged as ClashMetaConfig;
+}
+
+function listToMap(listName: string, mapField: string, keyFn: (record: Record<string, unknown>) => string): ModuleFn {
+    return (config: Record<string, unknown>) => {
+        return {
+            [mapField]: deferred(() => {
+                const finalList = config[listName] as Array<Record<string, unknown>> || [];
+                const map: Record<string, Record<string, unknown>> = {};
+                for (const item of finalList) {
+                    const key = keyFn(item);
+                    if (key) {
+                        map[key] = item;
+                    }
+                }
+                console.log(mapField, listName, JSON.stringify(map, null, 2));
+                return map;
+            }),
+        };
+    }
 }
 
 export default main;
