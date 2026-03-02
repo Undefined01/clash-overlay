@@ -159,7 +159,7 @@ export function createModuleMerge(options?: ModuleMergeOptions): MergeFn {
             // New key
             if (!(key in result) || result[key] === undefined) {
                 if (!isMeta && isArrayLike(extRaw)) {
-                    result[key] = { __orderedList: true, segments: toSegments(extRaw) } as OrderedList;
+                    result[key] = { __type: 'order-list', segments: toSegments(extRaw) } as OrderedList;
                 } else {
                     result[key] = extRaw;
                 }
@@ -192,7 +192,7 @@ export function createModuleMerge(options?: ModuleMergeOptions): MergeFn {
                 }
                 const curSegs = toSegments(curRaw);
                 const extSegs = toSegments(extRaw);
-                result[key] = { __orderedList: true, segments: [...curSegs, ...extSegs] } as OrderedList;
+                result[key] = { __type: 'order-list', segments: [...curSegs, ...extSegs] } as OrderedList;
                 continue;
             }
 

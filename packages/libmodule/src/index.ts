@@ -51,7 +51,6 @@ export { resolveDeferred, resolveDeferredAsync } from './resolve.js';
 export {
     applyOverlays,
     applyOverlaysAsync,
-    simpleMerge,
     extends_,
     composeManyExtensions,
     makeExtensible,
@@ -63,15 +62,3 @@ export {
     moduleMerge,
     cleanup,
 } from './module-merge.js';
-
-// High-level processors
-export {
-    REMOVE,
-    applyOverlay,
-    mergeModule,
-} from './processors.js';
-export type {
-    ModuleFn,
-    ApplyOverlayOptions,
-    MergeModuleOptions,
-} from './processors.js';

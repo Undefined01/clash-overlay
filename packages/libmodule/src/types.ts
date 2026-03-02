@@ -5,7 +5,7 @@
 
 /** Deferred value — resolved after all overlays merge. */
 export interface Deferred<T = unknown> {
-    readonly __deferred: true;
+    readonly __type: 'deferred';
     readonly fn: () => T | Promise<T>;
 }
 
@@ -32,14 +32,14 @@ export interface Override<T = unknown> {
 
 /** Ordered list segment — positions elements via sort order. */
 export interface Ordered<T = unknown> {
-    readonly __ordered: true;
+    readonly __type: 'order';
     readonly order: number;
     readonly items: T[];
 }
 
 /** Accumulated ordered segments (internal merge state). */
 export interface OrderedList<T = unknown> {
-    readonly __orderedList: true;
+    readonly __type: 'order-list';
     readonly segments: Array<{ order: number; items: T[] }>;
 }
 

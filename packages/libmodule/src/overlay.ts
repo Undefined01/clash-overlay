@@ -11,7 +11,6 @@
 //   - `prev`: the accumulated state from all previous overlays (immediately available)
 //   - `final`: the state after ALL overlays are applied (lazy, use in deferred/getters)
 
-import { isDeferred } from './deferred.js';
 import { resolveDeferred, resolveDeferredAsync } from './resolve.js';
 import type { OverlayFn, AsyncOverlayFn, ApplyOverlaysOptions } from './types.js';
 
@@ -152,32 +151,6 @@ function shallowMerge(
     extension: Record<string, unknown>,
 ): Record<string, unknown> {
     return { ...current, ...extension };
-}
-
-/**
- * Simple merge strategy: concatenate arrays, shallow-merge objects, last-writer-wins for scalars.
- */
-export function simpleMerge(
-    current: Record<string, unknown>,
-    extension: Record<string, unknown>,
-): Record<string, unknown> {
-    const result: Record<string, unknown> = { ...current };
-    for (const [key, value] of Object.entries(extension)) {
-        if (!(key in result)) {
-            result[key] = value;
-        } else if (Array.isArray(result[key]) && Array.isArray(value)) {
-            result[key] = [...(result[key] as unknown[]), ...value];
-        } else if (
-            typeof result[key] === 'object' && result[key] !== null && !Array.isArray(result[key]) &&
-            typeof value === 'object' && value !== null && !Array.isArray(value) &&
-            !isDeferred(result[key]) && !isDeferred(value)
-        ) {
-            result[key] = { ...(result[key] as Record<string, unknown>), ...(value as Record<string, unknown>) };
-        } else {
-            result[key] = value;
-        }
-    }
-    return result;
 }
 
 // ─── Nix-Compatible Primitives (for reference) ─────────────────────

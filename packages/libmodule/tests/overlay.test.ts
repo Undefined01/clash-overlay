@@ -1,11 +1,10 @@
-// tests/overlay.test.ts — Tests for applyOverlays, simpleMerge, makeExtensible
+// tests/overlay.test.ts — Tests for applyOverlays and makeExtensible
 import { describe, it, expect } from 'vitest';
 import {
     deferred,
-    mkDefault, mkForce,
-    applyOverlays, applyOverlaysAsync, simpleMerge, makeExtensible,
+    applyOverlays, applyOverlaysAsync, makeExtensible,
 } from '../src/index.js';
-import type { MergeFn, OverlayFn } from '../src/index.js';
+import type { MergeFn } from '../src/index.js';
 
 // ─── applyOverlays: basic mechanics ─────────────────────────────────
 
@@ -172,32 +171,6 @@ describe('applyOverlaysAsync', () => {
             ],
         );
         expect(result.answer).toBe(42);
-    });
-});
-
-// ─── simpleMerge ────────────────────────────────────────────────────
-
-describe('simpleMerge', () => {
-    it('adds new keys', () => {
-        expect(simpleMerge({}, { a: 1 })).toEqual({ a: 1 });
-    });
-
-    it('concatenates arrays', () => {
-        expect(simpleMerge({ a: [1] }, { a: [2] })).toEqual({ a: [1, 2] });
-    });
-
-    it('shallow merges objects', () => {
-        expect(simpleMerge({ o: { a: 1 } }, { o: { b: 2 } })).toEqual({ o: { a: 1, b: 2 } });
-    });
-
-    it('later scalar wins', () => {
-        expect(simpleMerge({ a: 1 }, { a: 2 })).toEqual({ a: 2 });
-    });
-
-    it('does not merge deferred as objects', () => {
-        const d = deferred(() => 42);
-        const result = simpleMerge({ a: { x: 1 } }, { a: d as unknown as Record<string, unknown> });
-        expect(result.a).toBe(d);
     });
 });
 

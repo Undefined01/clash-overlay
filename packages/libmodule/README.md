@@ -11,9 +11,6 @@ API 参考文档可通过 `pnpm docs` 自动生成至 `docs/api/`。
 - [核心概念](#核心概念)
 - [安装](#安装)
 - [快速上手](#快速上手)
-- [高阶处理器](#高阶处理器)
-  - [ApplyOverlay](#applyoverlay)
-  - [MergeModule](#mergemodule)
 - [Overlay 系统](#overlay-系统)
   - [基本用法](#基本用法)
   - [prev 与 final](#prev-与-final)
@@ -111,54 +108,6 @@ console.log(config);
 
 ---
 
-## 高阶处理器
-
-### ApplyOverlay
-
-`applyOverlay(base, overlays)` 是面向 attrset 的 overlay 处理器，语义接近 nixpkgs overlay：
-
-- overlay 形如 `(final, prev) => attrs`
-- 可以新增/覆盖 key（顶层浅替换，不做对象深合并）
-- 可以用 `REMOVE` 或 `null` 删除 key
-
-```ts
-import { applyOverlay, REMOVE } from 'libmodule';
-
-const result = await applyOverlay(
-  { a: { b: { c: 1 } }, b: { x: 2 } },
-  [
-    () => ({ a: { d: 2 } }),
-    () => ({ b: REMOVE }),
-  ],
-);
-// { a: { d: 2 } }
-```
-
-### MergeModule
-
-`mergeModule(base, modules)` 是面向配置模块的处理器，模块签名是：
-
-```ts
-type Module = (config: Record<string, unknown>) => Record<string, unknown> | Promise<Record<string, unknown>>;
-```
-
-模块只接收最终配置 `config`，适用于 NixOS module 风格：
-
-```ts
-import { mergeModule, mkDefault, mkForce } from 'libmodule';
-
-const config = await mergeModule(
-  {},
-  [
-    () => ({ port: mkDefault(7890) }),
-    () => ({ port: mkForce(443) }),
-  ],
-);
-// { port: 443 }
-```
-
----
-
 ## Overlay 系统
 
 ### 基本用法
@@ -170,7 +119,7 @@ const config = await mergeModule(
 - `options.merge`：合并策略（推荐使用 `moduleMerge`）
 
 ```ts
-import { applyOverlays, simpleMerge } from 'libmodule';
+import { applyOverlays } from 'libmodule';
 
 const result = applyOverlays(
   { name: 'app' },
@@ -434,15 +383,6 @@ const final = cleanup(merged);
 
 ## 其他工具函数
 
-### simpleMerge
-
-一个简单的合并策略：数组拼接、对象浅合并、标量后者覆盖。不做优先级检测，不做排序。适合快速原型。
-
-```ts
-import { applyOverlays, simpleMerge } from 'libmodule';
-const result = applyOverlays({}, overlays, { merge: simpleMerge });
-```
-
 ### makeExtensible
 
 让一个对象变得可"扩展"——返回一个带 `.extend()` 方法的对象：
@@ -507,7 +447,6 @@ AFTER_ORDER         // 1500
 ```ts
 // Overlay 核心
 applyOverlays(base, overlays, options?)
-simpleMerge(current, extension)
 makeExtensible(base, overlays?)
 extends_(overlay, baseFunc)
 composeManyExtensions(overlays)

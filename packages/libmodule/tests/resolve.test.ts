@@ -64,7 +64,7 @@ describe('resolveDeferred', () => {
 
     it('flattens ordered lists by sort order', () => {
         const orderedList = {
-            __orderedList: true,
+            __type: 'order-list',
             segments: [
                 { order: 1500, items: ['c'] },
                 { order: 500, items: ['a'] },
@@ -76,7 +76,7 @@ describe('resolveDeferred', () => {
 
     it('stable sort: same order preserves insertion order', () => {
         const orderedList = {
-            __orderedList: true,
+            __type: 'order-list',
             segments: [
                 { order: 1000, items: ['first'] },
                 { order: 1000, items: ['second'] },
@@ -88,7 +88,7 @@ describe('resolveDeferred', () => {
 
     it('resolves deferred within ordered list items', () => {
         const orderedList = {
-            __orderedList: true,
+            __type: 'order-list',
             segments: [
                 { order: 500, items: [deferred(() => 'resolved')] },
             ],

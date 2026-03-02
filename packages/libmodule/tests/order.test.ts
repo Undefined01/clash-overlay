@@ -26,7 +26,7 @@ describe('order constants', () => {
 describe('mkBefore', () => {
     it('creates ordered with BEFORE_ORDER', () => {
         const o = mkBefore(['a', 'b']);
-        expect(o.__ordered).toBe(true);
+        expect(o.__type).toBe('order');
         expect(o.order).toBe(BEFORE_ORDER);
         expect(o.items).toEqual(['a', 'b']);
     });
@@ -41,7 +41,7 @@ describe('mkBefore', () => {
 describe('mkAfter', () => {
     it('creates ordered with AFTER_ORDER', () => {
         const o = mkAfter(['x']);
-        expect(o.__ordered).toBe(true);
+        expect(o.__type).toBe('order');
         expect(o.order).toBe(AFTER_ORDER);
         expect(o.items).toEqual(['x']);
     });
@@ -50,7 +50,7 @@ describe('mkAfter', () => {
 describe('mkOrder', () => {
     it('creates ordered with custom order', () => {
         const o = mkOrder(750, ['mid']);
-        expect(o.__ordered).toBe(true);
+        expect(o.__type).toBe('order');
         expect(o.order).toBe(750);
         expect(o.items).toEqual(['mid']);
     });
@@ -82,14 +82,14 @@ describe('isOrdered', () => {
         expect(isOrdered(null)).toBe(false);
         expect(isOrdered(undefined)).toBe(false);
         expect(isOrdered({})).toBe(false);
-        expect(isOrdered({ __ordered: false })).toBe(false);
+        expect(isOrdered({ __type: 'other' })).toBe(false);
         expect(isOrdered(42)).toBe(false);
     });
 });
 
 describe('isOrderedList', () => {
     it('detects accumulated segments', () => {
-        expect(isOrderedList({ __orderedList: true, segments: [] })).toBe(true);
+        expect(isOrderedList({ __type: 'order-list', segments: [] })).toBe(true);
     });
 
     it('rejects non-ordered-list values', () => {
@@ -97,7 +97,7 @@ describe('isOrderedList', () => {
         expect(isOrderedList(null)).toBe(false);
         expect(isOrderedList(undefined)).toBe(false);
         expect(isOrderedList({})).toBe(false);
-        expect(isOrderedList({ __orderedList: false })).toBe(false);
+        expect(isOrderedList({ __type: 'order' })).toBe(false);
     });
 });
 
@@ -105,7 +105,7 @@ describe('isArrayLike', () => {
     it('detects all array-like types', () => {
         expect(isArrayLike([1, 2])).toBe(true);
         expect(isArrayLike(mkOrder(10, []))).toBe(true);
-        expect(isArrayLike({ __orderedList: true, segments: [] })).toBe(true);
+        expect(isArrayLike({ __type: 'order-list', segments: [] })).toBe(true);
     });
 
     it('rejects non-array-like values', () => {

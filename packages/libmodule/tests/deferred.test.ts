@@ -5,7 +5,7 @@ import { deferred, isDeferred } from '../src/index.js';
 describe('deferred', () => {
     it('creates a deferred wrapper', () => {
         const d = deferred(() => 42);
-        expect(d.__deferred).toBe(true);
+        expect(d.__type).toBe('deferred');
         expect(typeof d.fn).toBe('function');
         expect(d.fn()).toBe(42);
     });
@@ -37,14 +37,14 @@ describe('isDeferred', () => {
         expect(isDeferred('str')).toBe(false);
         expect(isDeferred({})).toBe(false);
         expect(isDeferred([])).toBe(false);
-        expect(isDeferred({ __deferred: false })).toBe(false);
-        expect(isDeferred({ __deferred: 'true' })).toBe(false);
+        expect(isDeferred({ __type: 'other' })).toBe(false);
+        expect(isDeferred({ __type: true })).toBe(false);
         expect(isDeferred({ a: deferred(() => 1 )})).toBe(false);
         expect(isDeferred([ deferred(() => 1) ])).toBe(false);
     });
 
-    it('requires __deferred === true (not truthy)', () => {
-        expect(isDeferred({ __deferred: 1 })).toBe(false);
-        expect(isDeferred({ __deferred: true, fn: () => 1 })).toBe(true);
+    it('requires __type === deferred', () => {
+        expect(isDeferred({ __type: 1 })).toBe(false);
+        expect(isDeferred({ __type: 'deferred', fn: () => 1 })).toBe(true);
     });
 });

@@ -13,10 +13,10 @@ import type { Deferred } from './types.js';
  * });
  */
 export function deferred<T>(fn: () => T | Promise<T>): Deferred<T> {
-    return { __deferred: true, fn };
+    return { __type: 'deferred', fn };
 }
 
 /** Check if a value is a deferred wrapper. */
 export function isDeferred(val: unknown): val is Deferred {
-    return val !== null && typeof val === 'object' && (val as Deferred).__deferred === true;
+    return val !== null && typeof val === 'object' && (val as Deferred).__type === 'deferred';
 }

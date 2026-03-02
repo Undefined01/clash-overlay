@@ -23,14 +23,14 @@ export const AFTER_ORDER = 1500;
  * Place list elements near the front (order 500).
  */
 export function mkBefore<T>(items: T[]): Ordered<T> {
-    return { __ordered: true, order: BEFORE_ORDER, items };
+    return { __type: 'order', order: BEFORE_ORDER, items };
 }
 
 /**
  * Place list elements near the end (order 1500).
  */
 export function mkAfter<T>(items: T[]): Ordered<T> {
-    return { __ordered: true, order: AFTER_ORDER, items };
+    return { __type: 'order', order: AFTER_ORDER, items };
 }
 
 /**
@@ -41,17 +41,17 @@ export function mkAfter<T>(items: T[]): Ordered<T> {
  * @param items - Array of items
  */
 export function mkOrder<T>(order: number, items: T[]): Ordered<T> {
-    return { __ordered: true, order, items };
+    return { __type: 'order', order, items };
 }
 
 /** Check if a value is an order wrapper (mkBefore/mkAfter/mkOrder). */
 export function isOrdered(val: unknown): val is Ordered {
-    return val !== null && typeof val === 'object' && (val as Ordered).__ordered === true;
+    return val !== null && typeof val === 'object' && (val as Ordered).__type === 'order';
 }
 
 /** Check if a value is accumulated ordered segments (internal). */
 export function isOrderedList(val: unknown): val is OrderedList {
-    return val !== null && typeof val === 'object' && (val as OrderedList).__orderedList === true;
+    return val !== null && typeof val === 'object' && (val as OrderedList).__type === 'order-list';
 }
 
 /** Check if a value is array-like (plain array, ordered, or ordered list). */
