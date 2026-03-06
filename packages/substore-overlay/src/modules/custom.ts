@@ -2,9 +2,10 @@
 
 import { externalIcon, trafficGroup } from '../lib/clash.js';
 import { mkOrder } from 'libmodule';
+import type { ModuleArgs } from 'libmodule';
 
 export default function customModule(
-    config: Record<string, unknown>,
+    { config }: ModuleArgs,
 ): Record<string, unknown> {
 
     return {

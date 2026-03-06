@@ -5,9 +5,10 @@ import {
     trafficGroup, miniIcon,
 } from '../lib/clash.js';
 import { mkOrder } from 'libmodule';
+import type { ModuleArgs } from 'libmodule';
 
 export default function domesticModule(
-    config: Record<string, unknown>,
+    { config }: ModuleArgs,
 ): Record<string, unknown> {
     const cn = dustinRule('cn');
     const cnIp = dustinRule('cnip');

@@ -232,11 +232,12 @@ describe('moduleMerge — scalar conflicts (Nix priorities)', () => {
 // ─── Deferred values ────────────────────────────────────────────────
 
 describe('moduleMerge — deferred values', () => {
-    it('deferred extension replaces current', () => {
+    it('deferred extension merges with current via deferredMerge', () => {
+        // deferred(() => 42) at priority 100 vs mkDefault(0) at priority 1000 → 42 wins
         const result = applyOverlays(
             {},
             [
-                () => ({ count: 0 }),
+                () => ({ count: mkDefault(0) }),
                 () => ({ count: deferred(() => 42) }),
             ],
             { merge: moduleMerge },
@@ -254,12 +255,109 @@ describe('moduleMerge — deferred values', () => {
         const result = applyOverlays(
             {},
             [
-                () => ({ x: 10, y: deferred(() => 0) }),
+                () => ({ x: 10 }),
                 (final) => ({ y: deferred(() => (final as Record<string, number>).x * 2) }),
             ],
             { merge: moduleMerge },
         );
         expect(result.y).toBe(20);
+    });
+
+    it('deferred ext with existing array: both contribute', () => {
+        const result = applyOverlays(
+            {},
+            [
+                () => ({ packages: ['vim'] }),
+                () => ({ packages: deferred(() => ['firefox']) }),
+            ],
+            { merge: moduleMerge },
+        );
+        expect(result.packages).toEqual(['vim', 'firefox']);
+    });
+
+    it('deferred ext resolving to undefined preserves current', () => {
+        const result = applyOverlays(
+            {},
+            [
+                () => ({ packages: ['vim'] }),
+                () => ({ packages: deferred(() => undefined) }),
+            ],
+            { merge: moduleMerge },
+        );
+        expect(result.packages).toEqual(['vim']);
+    });
+
+    it('both sides deferred: merges after resolve', () => {
+        const result = applyOverlays(
+            {},
+            [
+                () => ({ items: deferred(() => ['a']) }),
+                () => ({ items: deferred(() => ['b']) }),
+            ],
+            { merge: moduleMerge },
+        );
+        expect(result.items).toEqual(['a', 'b']);
+    });
+
+    it('three-module chain: all array contributions preserved', () => {
+        const result = applyOverlays(
+            {},
+            [
+                () => ({ rules: ['base'] }),
+                () => ({ rules: deferred(() => ['mid']) }),
+                () => ({ rules: deferred(() => ['last']) }),
+            ],
+            { merge: moduleMerge },
+        );
+        expect(result.rules).toEqual(['base', 'mid', 'last']);
+    });
+
+    it('deferred current with concrete ext', () => {
+        const result = applyOverlays(
+            {},
+            [
+                () => ({ items: deferred(() => ['a']) }),
+                () => ({ items: ['b'] }),
+            ],
+            { merge: moduleMerge },
+        );
+        expect(result.items).toEqual(['a', 'b']);
+    });
+
+    it('deferred with priority wrappers', () => {
+        const result = applyOverlays(
+            {},
+            [
+                () => ({ port: mkDefault(80) }),
+                () => ({ port: deferred(() => 443) }),
+            ],
+            { merge: moduleMerge },
+        );
+        expect(result.port).toBe(443);
+    });
+
+    it('deferred resolving to mkForce wins over bare', () => {
+        const result = applyOverlays(
+            {},
+            [
+                () => ({ port: 80 }),
+                () => ({ port: deferred(() => mkForce(443)) }),
+            ],
+            { merge: moduleMerge },
+        );
+        expect(result.port).toBe(443);
+    });
+
+    it('deferred resolving to mkDefault loses to bare', () => {
+        const result = applyOverlays(
+            {},
+            [
+                () => ({ port: 80 }),
+                () => ({ port: deferred(() => mkDefault(443)) }),
+            ],
+            { merge: moduleMerge },
+        );
+        expect(result.port).toBe(80);
     });
 });
 

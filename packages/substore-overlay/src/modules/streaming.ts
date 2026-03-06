@@ -2,9 +2,10 @@
 
 import { dustinRule, rulesetRule, trafficGroup, qureIcon } from '../lib/clash.js';
 import { mkOrder } from 'libmodule';
+import type { ModuleArgs } from 'libmodule';
 
 export default function streamingModule(
-    config: Record<string, unknown>,
+    { config }: ModuleArgs,
 ): Record<string, unknown> {
     const domainSets = [
         'netflix', 'disney', 'max', 'primevideo', 'appletv',

@@ -54,7 +54,7 @@ describe('evalModules', () => {
 
     it('allows referencing final config values via deferred', () => {
         const a: ModuleFn = () => ({ x: 10 });
-        const b: ModuleFn = (config) => ({
+        const b: ModuleFn = ({ config }) => ({
             y: deferred(() => (config.x as number) * 2),
         });
         const result = evalModules({}, [a, b]);
@@ -62,7 +62,7 @@ describe('evalModules', () => {
     });
 
     it('supports forward references (later module defines key)', () => {
-        const a: ModuleFn = (config) => ({
+        const a: ModuleFn = ({ config }) => ({
             x: deferred(() => config.y),
         });
         const b: ModuleFn = () => ({ y: 42 });
@@ -73,7 +73,7 @@ describe('evalModules', () => {
     it('normalizes config access inside deferred (arrays are plain arrays)', () => {
         const a: ModuleFn = () => ({ items: ['a'] });
         const b: ModuleFn = () => ({ items: ['b'] });
-        const c: ModuleFn = (config) => ({
+        const c: ModuleFn = ({ config }) => ({
             count: deferred(() => (config.items as unknown[]).length),
         });
         const result = evalModules({}, [a, b, c]);
@@ -83,7 +83,7 @@ describe('evalModules', () => {
 
     it('normalizes config access inside deferred (overrides are unwrapped)', () => {
         const a: ModuleFn = () => ({ port: mkDefault(100) });
-        const b: ModuleFn = (config) => ({
+        const b: ModuleFn = ({ config }) => ({
             portPlus: deferred(() => (config.port as number) + 1),
         });
         expect(evalModules({}, [a, b]).portPlus).toBe(101);
@@ -121,17 +121,17 @@ describe('evalModules', () => {
 
     it('throws on eager config access in module body', () => {
         const a: ModuleFn = () => ({ a: 1 });
-        const bad: ModuleFn = (config) => ({ b: config.a });
+        const bad: ModuleFn = ({ config }) => ({ b: config.a });
         expect(() => evalModules({}, [a, bad])).toThrow(/Cannot eagerly access config\.a/);
     });
 
     it('throws on "in" checks against config during module evaluation', () => {
-        const bad: ModuleFn = (config) => ({ ok: 'a' in config });
+        const bad: ModuleFn = ({ config }) => ({ ok: 'a' in config });
         expect(() => evalModules({}, [bad])).toThrow(/Cannot check 'config' membership/);
     });
 
     it('throws on enumeration of config during module evaluation', () => {
-        const bad: ModuleFn = (config) => ({ keys: Object.keys(config) });
+        const bad: ModuleFn = ({ config }) => ({ keys: Object.keys(config) });
         expect(() => evalModules({}, [bad])).toThrow(/Cannot enumerate 'config'/);
     });
 
@@ -179,7 +179,7 @@ describe('evalModules', () => {
     });
 
     it('allows imported modules to reference importer-defined values via deferred', () => {
-        const imported: ModuleFn = (config) => ({
+        const imported: ModuleFn = ({ config }) => ({
             seen: deferred(() => config.flag),
         });
         const root: ModuleFn = () => ({ _imports: [imported], flag: true });
@@ -237,10 +237,46 @@ describe('evalModules', () => {
     });
 });
 
+// ─── specialArgs ────────────────────────────────────────────────────
+
+describe('evalModules — specialArgs', () => {
+    it('passes specialArgs to modules', () => {
+        const mod: ModuleFn = ({ ctx }) => ({
+            greeting: deferred(() => `hello ${(ctx as any).user}`),
+        });
+        const result = evalModules({}, [mod], { args: { ctx: { user: 'alice' } } });
+        expect(result.greeting).toBe('hello alice');
+    });
+
+    it('modules without specialArgs still work (config only)', () => {
+        const mod: ModuleFn = () => ({ a: 1 });
+        const result = evalModules({}, [mod]);
+        expect(result).toEqual({ a: 1 });
+    });
+
+    it('specialArgs cannot override config', () => {
+        const mod: ModuleFn = () => ({ a: 1 });
+        expect(() => evalModules({}, [mod], { args: { config: {} } }))
+            .toThrow(/Cannot override "config"/);
+    });
+
+    it('multiple specialArgs are available', () => {
+        const mod: ModuleFn = ({ lib, ctx }) => ({
+            result: deferred(() => `${(lib as any).prefix}-${(ctx as any).name}`),
+        });
+        const result = evalModules({}, [mod], {
+            args: { lib: { prefix: 'test' }, ctx: { name: 'foo' } },
+        });
+        expect(result.result).toBe('test-foo');
+    });
+});
+
+// ─── async ──────────────────────────────────────────────────────────
+
 describe('evalModulesAsync', () => {
     it('supports async module functions', async () => {
         const a: AsyncModuleFn = async () => ({ a: 1 });
-        const b: AsyncModuleFn = async (config) => ({
+        const b: AsyncModuleFn = async ({ config }) => ({
             b: deferred(() => (config.a as number) + 1),
         });
         await expect(evalModulesAsync({}, [a, b])).resolves.toEqual({ a: 1, b: 2 });
@@ -248,7 +284,7 @@ describe('evalModulesAsync', () => {
 
     it('supports async deferred resolvers', async () => {
         const a: AsyncModuleFn = () => ({ base: 40 });
-        const b: AsyncModuleFn = (config) => ({
+        const b: AsyncModuleFn = ({ config }) => ({
             answer: deferred(async () => (config.base as number) + 2),
         });
         const result = await evalModulesAsync({}, [a, b]);
@@ -265,7 +301,7 @@ describe('evalModulesAsync', () => {
     it('normalizes config access inside deferred in async mode', async () => {
         const a: AsyncModuleFn = () => ({ items: ['a'] });
         const b: AsyncModuleFn = () => ({ items: ['b'] });
-        const c: AsyncModuleFn = (config) => ({
+        const c: AsyncModuleFn = ({ config }) => ({
             count: deferred(async () => (config.items as unknown[]).length),
         });
         const result = await evalModulesAsync({}, [a, b, c]);
@@ -307,5 +343,15 @@ describe('evalModulesAsync', () => {
         const result = await evalModulesAsync({}, [mod, mod]);
         expect(result.items).toEqual(['x']);
         expect(called).toBe(1);
+    });
+
+    it('passes specialArgs in async mode', async () => {
+        const mod: AsyncModuleFn = async ({ ctx }) => ({
+            name: (ctx as any).name,
+        });
+        const result = await evalModulesAsync({}, [mod], {
+            args: { ctx: { name: 'test' } },
+        });
+        expect(result.name).toBe('test');
     });
 });

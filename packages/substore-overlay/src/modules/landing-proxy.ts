@@ -2,17 +2,16 @@
 
 // 文档: https://github.com/MetaCubeX/Meta-Docs/blob/e8662ede5748e9bc5a23764ce447ea4f833d8e6c/docs/config/proxies/dialer-proxy.md
 
-import { deferred, mkOrder, ModuleFn } from 'libmodule';
+import type { ModuleArgs } from 'libmodule';
+import { mkOrder } from 'libmodule';
 import { GROUP_COMMON, PRIMITIVE_GROUPS, externalIcon, reorderProxies } from '../lib/clash.js';
-import { ProxyNode } from '../types/substore.js';
-import { ModuleContext } from './lib.js';
-import { ClashMetaConfig } from '../types/clash_meta_config.js';
+import type { ModuleContext } from './lib.js';
 import { NodeInfo } from '../lib/proxy-processor/types.js';
 
 export default function landingProxyModule(
-    ctx: ModuleContext<{}>,
-): ModuleFn {
-    return () => {
+    args: ModuleArgs,
+): Record<string, unknown> {
+    const ctx = args.ctx as ModuleContext;
     const forwardProxies = ctx.originalConfig.proxies?.filter(p => {
         let tags = (p._nodeInfo as NodeInfo)?.tags || [];
         return !tags.includes('落地');
@@ -44,5 +43,4 @@ export default function landingProxyModule(
             },
         },
     };
-};
 }

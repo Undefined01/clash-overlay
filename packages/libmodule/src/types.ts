@@ -70,15 +70,23 @@ export interface ApplyOverlaysOptions {
 
 // ─── Module System ─────────────────────────────────────────────────
 
-/** Module function: receives final merged config, returns a config fragment. */
-export type ModuleFn = (config: Record<string, unknown>) => Record<string, unknown>;
+/** Module args: config proxy plus any specialArgs. */
+export interface ModuleArgs {
+    config: Record<string, unknown>;
+    [key: string]: unknown;
+}
+
+/** Module function: receives { config, ...specialArgs }, returns a config fragment. */
+export type ModuleFn = (args: ModuleArgs) => Record<string, unknown>;
 
 /** Async module function: may return Promise. */
 export type AsyncModuleFn = (
-    config: Record<string, unknown>,
+    args: ModuleArgs,
 ) => Record<string, unknown> | Promise<Record<string, unknown>>;
 
 /** Options for evalModules / evalModulesAsync. */
 export interface EvalModulesOptions {
     merge?: MergeFn;
+    /** Additional arguments passed to all module functions alongside config. */
+    args?: Record<string, unknown>;
 }

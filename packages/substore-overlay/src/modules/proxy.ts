@@ -2,9 +2,10 @@
 
 import { dustinRule, rulesetRule, trafficGroup, qureIcon } from '../lib/clash.js';
 import { mkOrder, mkAfter } from 'libmodule';
+import type { ModuleArgs } from 'libmodule';
 
 export default function proxyModule(
-    config: Record<string, unknown>,
+    { config }: ModuleArgs,
 ): Record<string, unknown> {
     const proxy = dustinRule('proxy');
     const networktest = dustinRule('networktest');

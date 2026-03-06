@@ -11,6 +11,7 @@ export type {
     OverlayFn,
     AsyncOverlayFn,
     ApplyOverlaysOptions,
+    ModuleArgs,
     ModuleFn,
     AsyncModuleFn,
     EvalModulesOptions,
@@ -71,3 +72,9 @@ export {
     moduleMerge,
     cleanup,
 } from './module-merge.js';
+
+// Conditional config (Nix mkIf equivalent)
+export { mkIf } from './mkif.js';
+
+// Multi-definition merge (Nix mkMerge equivalent)
+export { mkMerge } from './mkmerge.js';

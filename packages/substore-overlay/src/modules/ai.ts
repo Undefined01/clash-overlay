@@ -3,9 +3,7 @@
 import { dustinRule, rulesetRule } from '../lib/clash.js';
 import { mkOrder } from 'libmodule';
 
-export default function aiModule(
-    _config: Record<string, unknown>,
-): Record<string, unknown> {
+export default function aiModule(): Record<string, unknown> {
     const ai = dustinRule('ai');
 
     return {

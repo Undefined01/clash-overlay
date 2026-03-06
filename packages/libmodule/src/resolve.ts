@@ -181,3 +181,35 @@ function isPromiseLike<T = unknown>(value: unknown): value is PromiseLike<T> {
         typeof (value as { then?: unknown }).then === 'function'
     );
 }
+
+// ─── Undefined Cleanup ──────────────────────────────────────────────
+
+/**
+ * Recursively remove keys whose values are `undefined`.
+ * - Object keys with `undefined` values are removed.
+ * - Array elements that are `undefined` are filtered out.
+ * - Objects that become empty after cleanup become `undefined` (propagate upward).
+ */
+export function deepCleanUndefined(obj: unknown): unknown {
+    if (obj === null || obj === undefined) return obj;
+    if (typeof obj !== 'object') return obj;
+    if (obj instanceof RegExp || obj instanceof Date) return obj;
+
+    if (Array.isArray(obj)) {
+        const cleaned = obj
+            .map(deepCleanUndefined)
+            .filter(item => item !== undefined);
+        return cleaned;
+    }
+
+    const result: Record<string, unknown> = {};
+    let hasKeys = false;
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+        const cleaned = deepCleanUndefined(value);
+        if (cleaned !== undefined) {
+            result[key] = cleaned;
+            hasKeys = true;
+        }
+    }
+    return hasKeys ? result : undefined;
+}

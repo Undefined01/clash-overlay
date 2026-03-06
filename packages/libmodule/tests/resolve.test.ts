@@ -3,7 +3,9 @@ import { describe, it, expect } from 'vitest';
 import {
     deferred, mkDefault, mkForce, mkOverride, mkOrder,
     resolveDeferred, resolveDeferredAsync,
+    applyOverlays,
 } from '../src/index.js';
+import { deepCleanUndefined } from '../src/resolve.js';
 
 describe('resolveDeferred', () => {
     // ─── Deferred resolution ─────────────────────────────────────────
@@ -134,6 +136,70 @@ describe('resolveDeferred', () => {
         expect((result.a as Record<string, unknown>).x).toBe(42);
         // b gets the original ref (visited) — this is the current behavior
         expect(result.b).toBe(shared);
+    });
+});
+
+// ─── deepCleanUndefined ──────────────────────────────────────────────
+
+describe('deepCleanUndefined', () => {
+    it('removes undefined keys from objects', () => {
+        expect(deepCleanUndefined({ a: 1, b: undefined, c: 3 })).toEqual({ a: 1, c: 3 });
+    });
+
+    it('filters undefined elements from arrays', () => {
+        expect(deepCleanUndefined([1, undefined, 3])).toEqual([1, 3]);
+    });
+
+    it('collapses empty objects to undefined', () => {
+        expect(deepCleanUndefined({ a: undefined })).toBeUndefined();
+    });
+
+    it('recursively cleans nested structures', () => {
+        expect(deepCleanUndefined({
+            a: { b: undefined, c: { d: undefined } },
+            e: 1,
+        })).toEqual({ e: 1 });
+    });
+
+    it('preserves non-undefined falsy values', () => {
+        expect(deepCleanUndefined({ a: 0, b: '', c: false, d: null }))
+            .toEqual({ a: 0, b: '', c: false, d: null });
+    });
+
+    it('handles arrays with nested undefined cleanup', () => {
+        expect(deepCleanUndefined([{ a: undefined }, { b: 1 }]))
+            .toEqual([{ b: 1 }]);
+    });
+
+    it('preserves Date and RegExp instances', () => {
+        const date = new Date();
+        const regex = /test/;
+        expect(deepCleanUndefined({ d: date, r: regex })).toEqual({ d: date, r: regex });
+    });
+
+    it('returns primitives as-is', () => {
+        expect(deepCleanUndefined(42)).toBe(42);
+        expect(deepCleanUndefined('hello')).toBe('hello');
+        expect(deepCleanUndefined(null)).toBeNull();
+        expect(deepCleanUndefined(undefined)).toBeUndefined();
+    });
+});
+
+// ─── Integration: deferred → undefined → cleanup ────────────────────
+
+describe('deepCleanUndefined integration with deferred', () => {
+    it('deferred resolving to undefined is cleaned in applyOverlays', () => {
+        const result = applyOverlays({}, [
+            () => ({ a: 1, b: deferred(() => undefined) }),
+        ]);
+        expect(result).toEqual({ a: 1 });
+    });
+
+    it('existing behavior not broken: normal values preserved', () => {
+        const result = applyOverlays({}, [
+            () => ({ a: 1, b: deferred(() => 2), c: [3] }),
+        ]);
+        expect(result).toEqual({ a: 1, b: 2, c: [3] });
     });
 });
 

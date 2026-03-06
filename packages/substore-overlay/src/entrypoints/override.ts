@@ -32,23 +32,21 @@ const ModuleContextSchema = v.object({
     originalConfig: v.any(),
 });
 
-type ModuleContext = v.InferOutput<typeof ModuleContextSchema>;
-
 // ── 模块注册（合并顺序 = 注册顺序，列表排序由 mkOrder 控制）──
-const modules: ((context: ModuleContext) => ModuleFn)[] = [
+const modules: ModuleFn[] = [
     generalModule,       // 通用配置（标量/对象，无列表）
     dnsModule,           // DNS 配置（标量/对象，无分流规则）
     baseGroupsModule,    // 基础代理组（mkBefore = 500）
     landingProxyModule,  // 落地代理（mkOrder 600）
-    () => customModule,        // 自定义规则（mkOrder 650）
-    () => sshModule,           // SSH 端口代理（mkOrder 675）
-    () => privateModule,       // 私有网络 + 广告（mkOrder 700）
-    () => academicModule,      // 学术网站 + Trackers（mkOrder 750）
-    () => domesticModule,      // 国内直连（mkOrder 800）
-    () => streamingModule,     // 流媒体（mkOrder 850）
-    () => gamingModule,        // 游戏平台（mkOrder 875）
-    () => aiModule,            // 国外 AI（mkOrder 900）
-    () => proxyModule,         // 国外代理 + 漏网之鱼（mkOrder 1100 + mkAfter）
+    customModule,        // 自定义规则（mkOrder 650）
+    sshModule,           // SSH 端口代理（mkOrder 675）
+    privateModule,       // 私有网络 + 广告（mkOrder 700）
+    academicModule,      // 学术网站 + Trackers（mkOrder 750）
+    domesticModule,      // 国内直连（mkOrder 800）
+    streamingModule,     // 流媒体（mkOrder 850）
+    gamingModule,        // 游戏平台（mkOrder 875）
+    aiModule as ModuleFn,// 国外 AI（mkOrder 900） — no args needed
+    proxyModule,         // 国外代理 + 漏网之鱼（mkOrder 1100 + mkAfter）
 ];
 
 // ── 入口函数 ──
@@ -64,10 +62,11 @@ function main(config: ClashMetaConfig): ClashMetaConfig {
 
     const merged = evalModules(
         base,
-        modules.map(fn => fn(ctx)).concat([
+        modules.concat([
             listToMap('proxy-groups', '_proxyGroupMap', item => String(item.name)),
             listToMap('proxies', '_proxyMap', item => String(item.name)),
         ]),
+        { args: { ctx } },
     );
 
     merged['proxy-groups'] = Object.values(merged._proxyGroupMap as Record<string, unknown>);
@@ -77,7 +76,7 @@ function main(config: ClashMetaConfig): ClashMetaConfig {
 }
 
 function listToMap(listName: string, mapField: string, keyFn: (record: Record<string, unknown>) => string): ModuleFn {
-    return (config: Record<string, unknown>) => {
+    return ({ config }: { config: Record<string, unknown> }) => {
         return {
             [mapField]: deferred(() => {
                 const finalList = config[listName] as Array<Record<string, unknown>> || [];

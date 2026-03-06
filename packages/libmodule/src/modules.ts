@@ -2,8 +2,8 @@
 // Nix-style module system evaluation with support for `_imports`.
 
 import { moduleMerge } from './module-merge.js';
-import { normalizeFinal, resolveDeferred, resolveDeferredAsync } from './resolve.js';
-import type { AsyncModuleFn, EvalModulesOptions, ModuleFn } from './types.js';
+import { deepCleanUndefined, normalizeFinal, resolveDeferred, resolveDeferredAsync } from './resolve.js';
+import type { AsyncModuleFn, EvalModulesOptions, ModuleArgs, ModuleFn } from './types.js';
 
 const IMPORTS_KEY = '_imports';
 
@@ -17,7 +17,14 @@ export function evalModules(
     let finalResolved: Record<string, unknown> | null = null;
     const configProxy = createConfigProxy(() => finalResolved);
 
-    const evaluated = collectModules(modules, configProxy);
+    // Construct module args: config is always present, user args cannot override it
+    const userArgs = options.args ?? {};
+    if ('config' in userArgs) {
+        throw new Error('Cannot override "config" in module args.');
+    }
+    const moduleArgs: ModuleArgs = { ...userArgs, config: configProxy };
+
+    const evaluated = collectModules(modules, moduleArgs);
 
     let current: Record<string, unknown> = stripImports({ ...base });
     for (const ext of evaluated) {
@@ -28,7 +35,8 @@ export function evalModules(
     const resolved = resolveDeferred(current) as Record<string, unknown>;
     finalResolved = resolved;
 
-    return stripImports(resolved);
+    const cleaned = deepCleanUndefined(stripImports(resolved));
+    return (cleaned ?? {}) as Record<string, unknown>;
 }
 
 export async function evalModulesAsync(
@@ -41,7 +49,13 @@ export async function evalModulesAsync(
     let finalResolved: Record<string, unknown> | null = null;
     const configProxy = createConfigProxy(() => finalResolved);
 
-    const evaluated = await collectModulesAsync(modules, configProxy);
+    const userArgs = options.args ?? {};
+    if ('config' in userArgs) {
+        throw new Error('Cannot override "config" in module args.');
+    }
+    const moduleArgs: ModuleArgs = { ...userArgs, config: configProxy };
+
+    const evaluated = await collectModulesAsync(modules, moduleArgs);
 
     let current: Record<string, unknown> = stripImports({ ...base });
     for (const ext of evaluated) {
@@ -52,12 +66,13 @@ export async function evalModulesAsync(
     const resolved = await resolveDeferredAsync(current) as Record<string, unknown>;
     finalResolved = resolved;
 
-    return stripImports(resolved);
+    const cleaned = deepCleanUndefined(stripImports(resolved));
+    return (cleaned ?? {}) as Record<string, unknown>;
 }
 
 function collectModules(
     modules: ModuleFn[],
-    config: Record<string, unknown>,
+    args: ModuleArgs,
 ): Array<Record<string, unknown>> {
     const ids = new WeakMap<Function, number>();
     let nextId = 1;
@@ -86,7 +101,7 @@ function collectModules(
         visiting.add(mod);
         stack.push(mod);
 
-        const raw = mod(config);
+        const raw = mod(args);
         if (isPromiseLike(raw)) {
             throw new Error(
                 `Module ${formatModule(mod)} returned a Promise in sync mode. ` +
@@ -122,7 +137,7 @@ function collectModules(
 
 async function collectModulesAsync(
     modules: AsyncModuleFn[],
-    config: Record<string, unknown>,
+    args: ModuleArgs,
 ): Promise<Array<Record<string, unknown>>> {
     const ids = new WeakMap<Function, number>();
     let nextId = 1;
@@ -151,7 +166,7 @@ async function collectModulesAsync(
         visiting.add(mod);
         stack.push(mod);
 
-        const raw = await mod(config);
+        const raw = await mod(args);
         assertPlainRecord(raw, formatModule(mod));
 
         const imports = readImports(raw, formatModule(mod));

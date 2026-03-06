@@ -11,7 +11,7 @@
 //   - `prev`: the accumulated state from all previous overlays (immediately available)
 //   - `final`: the state after ALL overlays are applied (lazy, use in deferred/getters)
 
-import { normalizeFinal, resolveDeferred, resolveDeferredAsync } from './resolve.js';
+import { deepCleanUndefined, normalizeFinal, resolveDeferred, resolveDeferredAsync } from './resolve.js';
 import type { OverlayFn, AsyncOverlayFn, ApplyOverlaysOptions } from './types.js';
 
 /**
@@ -85,7 +85,9 @@ export function applyOverlays(
     const resolved = resolveDeferred(current) as Record<string, unknown>;
     finalResolved = resolved; // update for any nested deferred that reference final
 
-    return resolved;
+    // Phase 3: Clean undefined values
+    const cleaned = deepCleanUndefined(resolved);
+    return (cleaned ?? {}) as Record<string, unknown>;
 }
 
 /**
@@ -143,7 +145,8 @@ export async function applyOverlaysAsync(
     const resolved = await resolveDeferredAsync(current) as Record<string, unknown>;
     finalResolved = resolved;
 
-    return resolved;
+    const cleaned = deepCleanUndefined(resolved);
+    return (cleaned ?? {}) as Record<string, unknown>;
 }
 
 function shallowMerge(

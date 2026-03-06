@@ -11,7 +11,7 @@
 import { deferred, isDeferred } from './deferred.js';
 import { isOverride, getPriority, unwrapPriority } from './priority.js';
 import { isOrdered, isOrderedList, isArrayLike, DEFAULT_ORDER } from './order.js';
-import type { MergeFn, OrderedList } from './types.js';
+import type { Deferred, MergeFn, OrderedList } from './types.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -145,6 +145,107 @@ export interface ModuleMergeOptions {
 
 }
 
+// ─── Resolved Value Merge ────────────────────────────────────────────
+
+/**
+ * Merge two concrete (non-deferred) values for the same key.
+ *
+ * Handles array concat, deep object merge, and scalar priority comparison.
+ * Exported for use by mkMerge.
+ */
+export function mergeResolvedValues(
+    key: string,
+    cur: unknown,
+    ext: unknown,
+    uniqueKeyFields?: Set<string>,
+): unknown {
+    // undefined = not declared
+    if (ext === undefined) return cur;
+    if (cur === undefined) {
+        if (isArrayLike(ext)) {
+            return { __type: 'order-list', segments: toSegments(ext) } as OrderedList;
+        }
+        return ext;
+    }
+
+    // ── Array-like: collect ordered segments ──
+    const curIsArr = isArrayLike(cur);
+    const extIsArr = isArrayLike(ext);
+
+    if (curIsArr || extIsArr) {
+        if (!curIsArr || !extIsArr) {
+            throw new Error(
+                `Type mismatch for "${key}": cannot merge array with non-array`,
+            );
+        }
+        const curSegs = toSegments(cur);
+        const extSegs = toSegments(ext);
+        return { __type: 'order-list', segments: [...curSegs, ...extSegs] } as OrderedList;
+    }
+
+    // Unwrap priorities for value comparison
+    const curVal = unwrapPriority(cur);
+    const extVal = unwrapPriority(ext);
+
+    // ── Object fields: deep merge ──
+    if (isPlainObject(curVal) && isPlainObject(extVal)) {
+        if (uniqueKeyFields?.has(key)) {
+            for (const k of Object.keys(extVal)) {
+                if (k in curVal) {
+                    throw new Error(
+                        `Unique-key conflict in "${key}": sub-key "${k}" already defined.`,
+                    );
+                }
+            }
+        }
+        return deepMerge(curVal, extVal);
+    }
+
+    // ── Scalar conflict resolution (Nix-compatible) ──
+    const curPri = getPriority(cur);
+    const extPri = getPriority(ext);
+
+    if (curPri === extPri) {
+        // Same priority: values must be equal (idempotent)
+        if (curVal === extVal) return cur;
+        throw new Error(
+            `Scalar conflict for key "${key}": ` +
+            `values ${JSON.stringify(curVal)} vs ${JSON.stringify(extVal)} ` +
+            `at same priority ${curPri}. ` +
+            `Use different mkOverride priorities to resolve.`,
+        );
+    }
+
+    // Different priorities: lower number (higher precedence) wins
+    return extPri < curPri ? ext : cur;
+}
+
+// ─── Deferred Merge ─────────────────────────────────────────────────
+
+/**
+ * When either side is deferred, produce a new deferred that resolves
+ * both sides and merges them at resolve time.
+ */
+function deferredMerge(
+    key: string,
+    cur: unknown,
+    ext: unknown,
+    uniqueKeyFields?: Set<string>,
+): Deferred {
+    return deferred(() => {
+        const resolvedCur = isDeferred(cur) ? cur.fn() : cur;
+        const resolvedExt = isDeferred(ext) ? ext.fn() : ext;
+
+        if (isPromiseLike(resolvedCur) || isPromiseLike(resolvedExt)) {
+            return Promise.all([resolvedCur, resolvedExt]).then(
+                ([c, e]) => mergeResolvedValues(key, c, e, uniqueKeyFields),
+            );
+        }
+
+        return mergeResolvedValues(key, resolvedCur, resolvedExt, uniqueKeyFields);
+    });
+}
+
 // ─── Factory ────────────────────────────────────────────────────────
 
 /**
@@ -189,73 +290,14 @@ export function createModuleMerge(options?: ModuleMergeOptions): MergeFn {
 
             const curRaw = result[key];
 
-            // Deferred values: keep extension for later resolution
-            if (isDeferred(extRaw)) {
-                result[key] = extRaw;
+            // ── Deferred on either side: defer the merge ──
+            if (isDeferred(curRaw) || isDeferred(extRaw)) {
+                result[key] = deferredMerge(key, curRaw, extRaw, uniqueKeyFields);
                 continue;
             }
 
-            // ── Array-like: collect ordered segments ──
-            const curIsArr = isArrayLike(curRaw);
-            const extIsArr = isArrayLike(extRaw);
-
-            if (curIsArr || extIsArr) {
-                if (!curIsArr || !extIsArr) {
-                    throw new Error(
-                        `Type mismatch for "${key}": cannot merge array with non-array`,
-                    );
-                }
-                const curSegs = toSegments(curRaw);
-                const extSegs = toSegments(extRaw);
-                result[key] = { __type: 'order-list', segments: [...curSegs, ...extSegs] } as OrderedList;
-                continue;
-            }
-
-            // Unwrap priorities for value comparison
-            const curVal = unwrapPriority(curRaw);
-            const extVal = unwrapPriority(extRaw);
-
-            // ── Object fields: deep merge ──
-            if (isPlainObject(curVal) && isPlainObject(extVal)) {
-                if (uniqueKeyFields.has(key)) {
-                    for (const k of Object.keys(extVal)) {
-                        if (k in curVal) {
-                            throw new Error(
-                                `Unique-key conflict in "${key}": sub-key "${k}" already defined.`,
-                            );
-                        }
-                    }
-                }
-                result[key] = deepMerge(curVal, extVal);
-                continue;
-            }
-
-            // Deferred current: keep extension
-            if (isDeferred(curRaw)) {
-                result[key] = extRaw;
-                continue;
-            }
-
-            // ── Scalar conflict resolution (Nix-compatible) ──
-            const curPri = getPriority(curRaw);
-            const extPri = getPriority(extRaw);
-
-            if (curPri === extPri) {
-                // Same priority: values must be equal (idempotent)
-                if (curVal === extVal) continue;
-                throw new Error(
-                    `Scalar conflict for key "${key}": ` +
-                    `values ${JSON.stringify(curVal)} vs ${JSON.stringify(extVal)} ` +
-                    `at same priority ${curPri}. ` +
-                    `Use different mkOverride priorities to resolve.`,
-                );
-            }
-
-            // Different priorities: lower number (higher precedence) wins
-            if (extPri < curPri) {
-                result[key] = extRaw;
-            }
-            // else: current has higher precedence, keep it
+            // ── Concrete merge ──
+            result[key] = mergeResolvedValues(key, curRaw, extRaw, uniqueKeyFields);
         }
 
         return result;

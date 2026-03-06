@@ -2,9 +2,10 @@
 
 import { dustinRule, rulesetRule, trafficGroup, miniIcon } from '../lib/clash.js';
 import { mkOrder } from 'libmodule';
+import type { ModuleArgs } from 'libmodule';
 
 export default function gamingModule(
-    config: Record<string, unknown>,
+    { config }: ModuleArgs,
 ): Record<string, unknown> {
     const games = dustinRule('games');
     const gamesIp = dustinRule('gamesip');
