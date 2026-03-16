@@ -1,6 +1,6 @@
 // substore-overlay/src/modules/ssh.ts — SSH 代理模块
 
-import { deferred, mkOrder } from 'libmodule';
+import { defer, mkOrder } from 'libmodule';
 import type { ModuleArgs } from 'libmodule';
 import { GROUP_COMMON, reorderProxies, externalIcon } from '../lib/clash.js';
 
@@ -13,7 +13,7 @@ export default function sshModule(
                 ...GROUP_COMMON,
                 name: 'SSH 代理',
                 type: 'select',
-                proxies: deferred(() =>
+                proxies: defer(() =>
                     reorderProxies(config._allSelectables as string[], 'DIRECT'),
                 ),
                 icon: externalIcon('fSPmETYJKmmk'),

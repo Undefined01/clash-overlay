@@ -3,46 +3,84 @@
 //
 // Two modes:
 // - Object mode: all defs are plain objects → collect keys, merge per-key
-// - Value mode: fold definitions using mergeResolvedValues
+// - Value mode: fold definitions using priorityMerge
 
-import { deferred, isDeferred } from './deferred.js';
-import { isOverride } from './priority.js';
-import { isOrdered, isOrderedList } from './order.js';
-import { mergeResolvedValues } from './module-merge.js';
+import { defer, isDefer, forceDefer } from './defer.js';
+import { getPriority, unwrapPriority } from './priority.js';
+import { isPlainObject, isPromiseLike, coreDeepMerge, scalarLastWins, toSegments } from './core-merge.js';
+import { isArrayLike } from './order.js';
+import { MARKER } from './symbols.js';
+import type { OrderedList } from './types.js';
 
-function isPlainObject(val: unknown): val is Record<string, unknown> {
-    return (
-        val !== null &&
-        typeof val === 'object' &&
-        !Array.isArray(val) &&
-        !isDeferred(val) &&
-        !isOverride(val) &&
-        !isOrdered(val) &&
-        !isOrderedList(val) &&
-        !(val instanceof RegExp) &&
-        !(val instanceof Date)
-    );
+function priorityMerge(key: string, cur: unknown, ext: unknown): unknown {
+    if (ext === undefined) return cur;
+    if (cur === undefined) {
+        if (isArrayLike(ext)) {
+            return { [MARKER]: 'order-list', segments: toSegments(ext) } as unknown as OrderedList;
+        }
+        return ext;
+    }
+
+    // Arrays: ordered concat
+    const curIsArr = isArrayLike(cur);
+    const extIsArr = isArrayLike(ext);
+    if (curIsArr || extIsArr) {
+        if (!curIsArr || !extIsArr) {
+            throw new Error(
+                `Type mismatch for "${key}": cannot merge array with non-array`,
+            );
+        }
+        const curSegs = toSegments(cur);
+        const extSegs = toSegments(ext);
+        return { [MARKER]: 'order-list', segments: [...curSegs, ...extSegs] } as unknown as OrderedList;
+    }
+
+    // Unwrap priorities for value comparison
+    const curVal = unwrapPriority(cur);
+    const extVal = unwrapPriority(ext);
+
+    // Objects: deep merge
+    if (isPlainObject(curVal) && isPlainObject(extVal)) {
+        return coreDeepMerge(key, curVal, extVal, scalarLastWins);
+    }
+
+    // Scalar conflict resolution (Nix-compatible)
+    const curPri = getPriority(cur);
+    const extPri = getPriority(ext);
+
+    if (curPri === extPri) {
+        if (curVal === extVal) return cur;
+        throw new Error(
+            `Scalar conflict for key "${key}": ` +
+            `values ${JSON.stringify(curVal)} vs ${JSON.stringify(extVal)} ` +
+            `at same priority ${curPri}. ` +
+            `Use different mkOverride priorities to resolve.`,
+        );
+    }
+
+    // Different priorities: lower number (higher precedence) wins
+    return extPri < curPri ? ext : cur;
 }
 
 function foldValues(values: unknown[]): unknown {
     if (values.length === 0) return undefined;
     let acc = values[0];
     for (let i = 1; i < values.length; i++) {
-        acc = mergeResolvedValues('mkMerge', acc, values[i]);
+        acc = priorityMerge('mkMerge', acc, values[i]);
     }
     return acc;
 }
 
 /**
- * Merge values: fold definitions using mergeResolvedValues.
+ * Merge values: fold definitions using priorityMerge.
  * If any definition is deferred, return a deferred that resolves all then folds.
  */
 function mkMergeValues(definitions: unknown[]): unknown {
-    const hasDeferred = definitions.some(d => isDeferred(d));
+    const hasDeferred = definitions.some(d => isDefer(d));
 
     if (hasDeferred) {
-        return deferred(() => {
-            const resolved = definitions.map(d => isDeferred(d) ? d.fn() : d);
+        return defer(() => {
+            const resolved = definitions.map(d => isDefer(d) ? forceDefer(d) : d);
             if (resolved.some(isPromiseLike)) {
                 return Promise.all(resolved).then(vals =>
                     foldValues(vals.filter(v => v !== undefined))
@@ -57,8 +95,6 @@ function mkMergeValues(definitions: unknown[]): unknown {
 
 /**
  * Merge objects: collect keys across all definitions, merge per-key.
- * All definitions must be plain objects (mkIf on objects produces plain objects
- * with deferred values per-key, so this handles mkIf composition naturally).
  */
 function mkMergeObjects(definitions: Record<string, unknown>[]): Record<string, unknown> {
     const keyValues = new Map<string, unknown[]>();
@@ -83,33 +119,10 @@ function mkMergeObjects(definitions: Record<string, unknown>[]): Record<string, 
 
 /**
  * Merge multiple definitions for the same key within a single module.
- *
- * Object mode: When all definitions are plain objects, collects all keys
- * across definitions and merges each key's values using standard merge rules.
- * This handles mkIf composition naturally since mkIf(cond, obj) returns a
- * plain object with deferred values per-key.
- *
- * Value mode: When definitions include non-object values (arrays, scalars, etc.),
- * folds them using standard merge rules.
- *
- * @param definitions - Array of values to merge
- * @returns Merged result, or undefined for empty input
- *
- * @example
- * // Object mode: merge config fragments with mkIf
- * mkMerge([
- *   { packages: ['vim'] },
- *   mkIf(() => config.gui, { packages: ['firefox'] }),
- * ])
- *
- * @example
- * // Value mode: merge arrays
- * { packages: mkMerge([['base'], mkIf(() => cond, ['extra'])]) }
  */
 export function mkMerge(definitions: unknown[]): unknown {
     if (definitions.length === 0) return undefined;
 
-    // Check if all definitions are plain objects (or undefined to skip)
     const nonUndefined = definitions.filter(d => d !== undefined);
     if (nonUndefined.length === 0) return undefined;
 
@@ -120,13 +133,4 @@ export function mkMerge(definitions: unknown[]): unknown {
     }
 
     return mkMergeValues(nonUndefined);
-}
-
-function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
-    return (
-        typeof value === 'object' &&
-        value !== null &&
-        'then' in value &&
-        typeof (value as { then?: unknown }).then === 'function'
-    );
 }

@@ -3,7 +3,7 @@
 //
 // Key insight: Nix's overlay system works because of pervasive lazy evaluation.
 // In JS, we simulate this with:
-//   1. A `deferred()` marker for values resolved after all overlays merge
+//   1. A `defer()` proxy for values resolved after all overlays merge
 //   2. A `final` Proxy that becomes accessible only after merge completes
 //   3. Two-phase evaluation: merge overlays → resolve deferred values
 //
@@ -47,7 +47,7 @@ export function applyOverlays(
             if (finalResolved === null) {
                 throw new Error(
                     `Cannot eagerly access final.${String(prop)} during overlay evaluation. ` +
-                    `Wrap in deferred(() => final.${String(prop)}).`,
+                    `Wrap in defer(() => final.${String(prop)}).`,
                 );
             }
             return finalResolved[prop as string];
@@ -109,7 +109,7 @@ export async function applyOverlaysAsync(
             if (finalResolved === null) {
                 throw new Error(
                     `Cannot eagerly access final.${String(prop)} during overlay evaluation. ` +
-                    `Wrap in deferred(() => final.${String(prop)}).`,
+                    `Wrap in defer(() => final.${String(prop)}).`,
                 );
             }
             return finalResolved[prop as string];

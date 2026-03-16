@@ -3,7 +3,6 @@
 
 // Types
 export type {
-    Deferred,
     Override,
     Ordered,
     OrderedList,
@@ -17,10 +16,19 @@ export type {
     EvalModulesOptions,
 } from './types.js';
 
-export type { ModuleMergeOptions } from './module-merge.js';
+export type { OptionType } from './option-types.js';
+export type { OptionDeclaration } from './options.js';
+export type { DeferProxy } from './defer.js';
+export type { ScalarHandler } from './core-merge.js';
 
-// Deferred values
-export { deferred, isDeferred } from './deferred.js';
+// Symbols
+export { MARKER, DEFER_SYMBOL } from './symbols.js';
+
+// Defer (Proxy-based lazy values)
+export { defer, isDefer, forceDefer } from './defer.js';
+
+// Option type system
+export { types, isOptionType, makeType } from './option-types.js';
 
 // Priority system (Nix-compatible)
 export {
@@ -66,12 +74,15 @@ export {
     evalModulesAsync,
 } from './modules.js';
 
-// Module merge (Nix module-system-style configuration merging)
+// Core merge (shared helpers and unified merge functions)
 export {
-    createModuleMerge,
-    moduleMerge,
-    cleanup,
-} from './module-merge.js';
+    deepMerge,
+    coreMerge,
+    coreDeepMerge,
+    isPlainObject,
+    scalarEqual,
+    scalarLastWins,
+} from './core-merge.js';
 
 // Conditional config (Nix mkIf equivalent)
 export { mkIf } from './mkif.js';

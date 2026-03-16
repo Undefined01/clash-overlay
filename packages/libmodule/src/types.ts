@@ -1,13 +1,7 @@
 // libmodule/src/types.ts
 // Core type definitions for the Nix-style overlay system.
 
-// ─── Deferred ───────────────────────────────────────────────────────
-
-/** Deferred value — resolved after all overlays merge. */
-export interface Deferred<T = unknown> {
-    readonly __type: 'deferred';
-    readonly fn: () => T | Promise<T>;
-}
+import type { MARKER } from './symbols.js';
 
 // ─── Priority (Nix-compatible) ──────────────────────────────────────
 
@@ -18,12 +12,9 @@ export interface Deferred<T = unknown> {
  *   mkForce:   priority 50
  *   bare value: priority 100 (implicit, DEFAULT_PRIORITY)
  *   mkDefault: priority 1000
- *
- * Corresponds to Nix's:
- *   { __type = "override"; inherit priority content; }
  */
 export interface Override<T = unknown> {
-    readonly __type: 'override';
+    readonly [MARKER]: 'override';
     readonly priority: number;
     readonly value: T;
 }
@@ -32,14 +23,14 @@ export interface Override<T = unknown> {
 
 /** Ordered list segment — positions elements via sort order. */
 export interface Ordered<T = unknown> {
-    readonly __type: 'order';
+    readonly [MARKER]: 'order';
     readonly order: number;
     readonly items: T[];
 }
 
 /** Accumulated ordered segments (internal merge state). */
 export interface OrderedList<T = unknown> {
-    readonly __type: 'order-list';
+    readonly [MARKER]: 'order-list';
     readonly segments: Array<{ order: number; items: T[] }>;
 }
 
@@ -86,7 +77,8 @@ export type AsyncModuleFn = (
 
 /** Options for evalModules / evalModulesAsync. */
 export interface EvalModulesOptions {
-    merge?: MergeFn;
     /** Additional arguments passed to all module functions alongside config. */
     args?: Record<string, unknown>;
+    /** Warning handler. Default: console.warn. */
+    onWarning?: (message: string) => void;
 }

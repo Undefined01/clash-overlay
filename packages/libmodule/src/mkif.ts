@@ -1,68 +1,51 @@
 // libmodule/src/mkif.ts
 // mkIf — conditional config fragments, pure sugar over deferred + undefined.
 //
-// For plain objects: expand each key to deferred(() => condition() ? value : undefined)
-// For non-objects: wrap as deferred(() => condition() ? value : undefined)
+// For plain objects: expand each key to defer(() => condition() ? value : undefined)
+// For non-objects: wrap as defer(() => condition() ? value : undefined)
+//
+// Boolean overload: eagerly returns value or {} when condition is a plain boolean.
 
-import { deferred } from './deferred.js';
-import { isDeferred } from './deferred.js';
-import { isOverride } from './priority.js';
-import { isOrdered, isOrderedList } from './order.js';
-
-function isPlainObject(val: unknown): val is Record<string, unknown> {
-    return (
-        val !== null &&
-        typeof val === 'object' &&
-        !Array.isArray(val) &&
-        !isDeferred(val) &&
-        !isOverride(val) &&
-        !isOrdered(val) &&
-        !isOrderedList(val) &&
-        !(val instanceof RegExp) &&
-        !(val instanceof Date)
-    );
-}
+import { defer } from './defer.js';
+import { isPlainObject } from './core-merge.js';
 
 /**
- * Conditionally include configuration based on a boolean function.
+ * Conditionally include configuration based on a boolean or boolean function.
  *
- * For plain objects: expands each key into a deferred that returns the value
- * or undefined based on the condition. Each key independently participates
- * in cross-module merge.
+ * **Boolean condition** (eager): returns value directly or empty object/undefined.
  *
- * For other values (scalars, arrays, wrapped primitives): wraps as a single
- * deferred returning the value or undefined.
+ * **Function condition** (lazy): for plain objects, expands each key into a
+ * deferred that returns the value or undefined based on the condition.
+ * For other values, wraps as a single deferred.
  *
- * @param condition - Function returning boolean (evaluated at resolve time)
+ * @param condition - Boolean or function returning boolean
  * @param value - Configuration fragment or value to conditionally include
- * @returns Expanded deferred(s)
- *
- * @example
- * // Object mode: each key is independently conditional
- * (config) => ({
- *   ...mkIf(() => config.enableDns, {
- *     dns: { enable: true },
- *     rules: ['dns-rule'],
- *   }),
- * })
- *
- * @example
- * // Value mode: single conditional value
- * (config) => ({
- *   port: mkIf(() => config.useTls, 443),
- * })
  */
 export function mkIf<T>(
-    condition: () => boolean,
+    condition: boolean | (() => boolean),
     value: T,
-): T extends Record<string, unknown> ? Record<string, unknown> : ReturnType<typeof deferred> {
+): T extends Record<string, unknown> ? Record<string, unknown> : ReturnType<typeof defer> {
+    // Eager boolean overload
+    if (typeof condition === 'boolean') {
+        if (isPlainObject(value)) {
+            return (condition ? value : {}) as any;
+        }
+        return (condition ? value : undefined) as any;
+    }
+
+    // Lazy function overload
     if (isPlainObject(value)) {
+        let cached: boolean | undefined;
+        const evalCond = () => {
+            if (cached === undefined) cached = condition();
+            return cached;
+        };
         const result: Record<string, unknown> = {};
         for (const [key, val] of Object.entries(value)) {
-            result[key] = deferred(() => condition() ? val : undefined);
+            result[key] = defer(() => evalCond() ? val : undefined);
         }
         return result as any;
     }
 
-    return deferred(() => condition() ? value : undefined) as any;
+    return defer(() => condition() ? value : undefined) as any;
 }

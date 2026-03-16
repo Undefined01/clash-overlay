@@ -23,12 +23,6 @@ export default function baseGroupsModule(
         proxies: ctx.originalConfig.proxies,
         _allSelectables: [...generalGroupNames, ...PRIMITIVE_GROUPS, ...proxies],
 
-        _proxyGroupMap: {
-            '手动选择': {
-                proxies: mkOrder(100, ['延迟测试', '负载均衡']),
-            },
-        },
-
         'proxy-groups': mkBefore([
             generalGroup(config, {
                 name: '手动选择',
@@ -58,6 +52,8 @@ export default function baseGroupsModule(
                     '(?i)香港|HK|Hong Kong|台湾|TW|Tai Wan|官网|TG|节点|到期|流量|返利|订阅',
                 icon: externalIcon('Nts60kQIvGqe'),
             }),
+            // 向手动选择组添加延迟测试和负载均衡（通过 keyedListOf 按 name 合并）
+            { name: '手动选择', proxies: mkOrder(100, ['延迟测试', '负载均衡']) },
         ]),
     };
 }

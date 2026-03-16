@@ -4,8 +4,7 @@ import { mergeList } from '../src/lib/helpers.js';
 import {
     mkBefore, mkAfter, mkOrder, mkDefault, mkForce,
     evalModules,
-    cleanup,
-    deferred,
+    defer,
 } from 'libmodule';
 import type { ModuleFn } from 'libmodule';
 import {
@@ -18,7 +17,7 @@ import {
 
 const fixture_general: ModuleFn = ({ config }) => ({
     mode: 'rule',
-    ipv6: deferred(() => {
+    ipv6: defer(() => {
         const ctx = config._ctx as any;
         return !!ctx.arguments?.ipv6Enabled;
     }),
@@ -29,7 +28,7 @@ const fixture_baseGroups: ModuleFn = ({ config }) => {
         'proxy-groups': mkBefore([
             generalGroup(config, {
                 name: '手动选择',
-                proxies: deferred(() => {
+                proxies: defer(() => {
                     const proxies = ((config.proxies as Array<{ name?: unknown }>) || [])
                         .map(p => String(p.name || ''))
                         .filter(Boolean);
@@ -67,6 +66,17 @@ const fixture_domestic: ModuleFn = () => {
     };
 };
 
+function stripMetadata(obj: Record<string, unknown>, prefix = '_'): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj)) {
+        if (key.startsWith(prefix)) continue;
+        if (value === undefined) continue;
+        if (value !== null && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0) continue;
+        result[key] = value;
+    }
+    return result;
+}
+
 function runModules(
     modules: ModuleFn[],
     config: { proxies: Array<{ name: string;[key: string]: unknown }> },
@@ -77,7 +87,7 @@ function runModules(
         .map(p => String(p.name || ''))
         .filter(Boolean);
 
-    return cleanup(evalModules(
+    return stripMetadata(evalModules(
         {
             ...config,
             _ctx: { arguments: rawArgs },

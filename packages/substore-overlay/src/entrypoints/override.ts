@@ -5,10 +5,12 @@
 // deferred 值在合并后统一解析。
 
 import { ClashMetaConfig } from '../types/clash_meta_config.js';
-import { deferred, evalModules, ModuleFn } from 'libmodule';
+import { evalModules } from 'libmodule';
+import type { ModuleFn } from 'libmodule';
 
 import * as v from 'valibot';
 
+import clashSchema from '../modules/schema.js';
 import generalModule from '../modules/general.js';
 import dnsModule from '../modules/dns.js';
 import baseGroupsModule from '../modules/base-groups.js';
@@ -34,6 +36,7 @@ const ModuleContextSchema = v.object({
 
 // ── 模块注册（合并顺序 = 注册顺序，列表排序由 mkOrder 控制）──
 const modules: ModuleFn[] = [
+    clashSchema,         // 配置选项声明（proxy-groups, proxies, rules, rule-providers）
     generalModule,       // 通用配置（标量/对象，无列表）
     dnsModule,           // DNS 配置（标量/对象，无分流规则）
     baseGroupsModule,    // 基础代理组（mkBefore = 500）
@@ -62,36 +65,11 @@ function main(config: ClashMetaConfig): ClashMetaConfig {
 
     const merged = evalModules(
         base,
-        modules.concat([
-            listToMap('proxy-groups', '_proxyGroupMap', item => String(item.name)),
-            listToMap('proxies', '_proxyMap', item => String(item.name)),
-        ]),
+        modules,
         { args: { ctx } },
     );
 
-    merged['proxy-groups'] = Object.values(merged._proxyGroupMap as Record<string, unknown>);
-    merged.proxies = Object.values(merged._proxyMap as Record<string, unknown>);
-
     return merged as ClashMetaConfig;
-}
-
-function listToMap(listName: string, mapField: string, keyFn: (record: Record<string, unknown>) => string): ModuleFn {
-    return ({ config }: { config: Record<string, unknown> }) => {
-        return {
-            [mapField]: deferred(() => {
-                const finalList = config[listName] as Array<Record<string, unknown>> || [];
-                const map: Record<string, Record<string, unknown>> = {};
-                for (const item of finalList) {
-                    const key = keyFn(item);
-                    if (key) {
-                        map[key] = item;
-                    }
-                }
-                console.log(mapField, listName, JSON.stringify(map, null, 2));
-                return map;
-            }),
-        };
-    }
 }
 
 export default main;

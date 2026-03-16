@@ -22,11 +22,8 @@ export default function landingProxyModule(
     }).map(p => p.name as string) ?? [];
 
     return {
-        _proxyGroupMap: {
-            '手动选择': {
-                proxies: mkOrder(705, ['落地代理']),
-            },
-            '落地代理': {
+        'proxy-groups': mkOrder(600, [
+            {
                 ...GROUP_COMMON,
                 name: '落地代理',
                 type: 'url-test',
@@ -34,13 +31,15 @@ export default function landingProxyModule(
                 'dialer-proxy': '落地前置',
                 icon: externalIcon('ABvCfQAJ'),
             },
-            '落地前置': {
+            {
                 ...GROUP_COMMON,
                 name: '落地前置',
                 type: 'select',
                 proxies: reorderProxies(PRIMITIVE_GROUPS.concat(forwardProxies), 'REJECT'),
                 icon: externalIcon('ABvCfQAJ'),
             },
-        },
+            // 向手动选择组添加落地代理（通过 keyedListOf 按 name 合并）
+            { name: '手动选择', proxies: mkOrder(705, ['落地代理']) },
+        ]),
     };
 }

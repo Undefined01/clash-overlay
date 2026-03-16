@@ -4,6 +4,7 @@ import {
     mkOverride, mkDefault, mkForce,
     isOverride, getPriority, unwrapPriority,
     DEFAULT_PRIORITY, MKDEFAULT_PRIORITY, MKFORCE_PRIORITY,
+    MARKER,
 } from '../src/index.js';
 
 // ─── Constants ──────────────────────────────────────────────────────
@@ -23,7 +24,7 @@ describe('priority constants', () => {
 describe('mkOverride', () => {
     it('wraps with explicit numeric priority', () => {
         const w = mkOverride(200, 'hello');
-        expect(w.__type).toBe('override');
+        expect((w as Record<symbol, unknown>)[MARKER]).toBe('override');
         expect(w.priority).toBe(200);
         expect(w.value).toBe('hello');
     });
@@ -40,7 +41,7 @@ describe('mkOverride', () => {
 describe('mkDefault', () => {
     it('wraps with priority 1000', () => {
         const w = mkDefault(42);
-        expect(w.__type).toBe('override');
+        expect((w as Record<symbol, unknown>)[MARKER]).toBe('override');
         expect(w.priority).toBe(1000);
         expect(w.value).toBe(42);
     });
@@ -56,7 +57,7 @@ describe('mkDefault', () => {
 describe('mkForce', () => {
     it('wraps with priority 50', () => {
         const w = mkForce('forced');
-        expect(w.__type).toBe('override');
+        expect((w as Record<symbol, unknown>)[MARKER]).toBe('override');
         expect(w.priority).toBe(50);
         expect(w.value).toBe('forced');
     });
@@ -83,8 +84,6 @@ describe('isOverride', () => {
         expect(isOverride('str')).toBe(false);
         expect(isOverride({})).toBe(false);
         expect(isOverride([])).toBe(false);
-        expect(isOverride({ __type: 'other' })).toBe(false);
-        expect(isOverride({ __type: 123 })).toBe(false);
     });
 
     it('rejects old-style __priority wrappers', () => {

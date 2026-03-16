@@ -1,9 +1,9 @@
 // tests/resolve.test.ts — Tests for resolveDeferred
 import { describe, it, expect } from 'vitest';
 import {
-    deferred, mkDefault, mkForce, mkOverride, mkOrder,
+    defer, mkDefault, mkForce, mkOverride, mkOrder,
     resolveDeferred, resolveDeferredAsync,
-    applyOverlays,
+    applyOverlays, MARKER,
 } from '../src/index.js';
 import { deepCleanUndefined } from '../src/resolve.js';
 
@@ -11,31 +11,31 @@ describe('resolveDeferred', () => {
     // ─── Deferred resolution ─────────────────────────────────────────
 
     it('resolves deferred values', () => {
-        expect(resolveDeferred(deferred(() => 42))).toBe(42);
+        expect(resolveDeferred(defer(() => 42))).toBe(42);
     });
 
     it('throws in sync mode when deferred returns Promise', () => {
-        expect(() => resolveDeferred(deferred(async () => 42)))
+        expect(() => resolveDeferred(defer(async () => 42)))
             .toThrow(/Use resolveDeferredAsync/);
     });
 
     it('resolves nested deferred values', () => {
-        const obj = { a: deferred(() => 1), b: { c: deferred(() => 2) } };
+        const obj = { a: defer(() => 1), b: { c: defer(() => 2) } };
         expect(resolveDeferred(obj)).toEqual({ a: 1, b: { c: 2 } });
     });
 
     it('resolves deferred in arrays', () => {
-        expect(resolveDeferred([deferred(() => 1), 2])).toEqual([1, 2]);
+        expect(resolveDeferred([defer(() => 1), 2])).toEqual([1, 2]);
     });
 
     it('resolves chained deferred values', () => {
-        const result = resolveDeferred(deferred(() => deferred(() => 42)));
+        const result = resolveDeferred(defer(() => defer(() => 42)));
         expect(result).toBe(42);
     });
 
     it('resolves deeply nested deferred', () => {
         const obj = {
-            a: { b: { c: deferred(() => ({ d: deferred(() => 'deep') })) } }
+            a: { b: { c: defer(() => ({ d: defer(() => 'deep') })) } }
         };
         expect(resolveDeferred(obj)).toEqual({ a: { b: { c: { d: 'deep' } } } });
     });
@@ -59,14 +59,14 @@ describe('resolveDeferred', () => {
     });
 
     it('unwraps Override containing deferred', () => {
-        expect(resolveDeferred(mkDefault(deferred(() => 99)))).toBe(99);
+        expect(resolveDeferred(mkDefault(defer(() => 99)))).toBe(99);
     });
 
     // ─── Ordered list flattening ─────────────────────────────────────
 
     it('flattens ordered lists by sort order', () => {
         const orderedList = {
-            __type: 'order-list',
+            [MARKER]: 'order-list',
             segments: [
                 { order: 1500, items: ['c'] },
                 { order: 500, items: ['a'] },
@@ -78,7 +78,7 @@ describe('resolveDeferred', () => {
 
     it('stable sort: same order preserves insertion order', () => {
         const orderedList = {
-            __type: 'order-list',
+            [MARKER]: 'order-list',
             segments: [
                 { order: 1000, items: ['first'] },
                 { order: 1000, items: ['second'] },
@@ -90,9 +90,9 @@ describe('resolveDeferred', () => {
 
     it('resolves deferred within ordered list items', () => {
         const orderedList = {
-            __type: 'order-list',
+            [MARKER]: 'order-list',
             segments: [
-                { order: 500, items: [deferred(() => 'resolved')] },
+                { order: 500, items: [defer(() => 'resolved')] },
             ],
         };
         expect(resolveDeferred(orderedList)).toEqual(['resolved']);
@@ -130,7 +130,7 @@ describe('resolveDeferred', () => {
     });
 
     it('handles multiple references to same object', () => {
-        const shared = { x: deferred(() => 42) };
+        const shared = { x: defer(() => 42) };
         const obj = { a: shared, b: shared };
         const result = resolveDeferred(obj) as Record<string, unknown>;
         expect((result.a as Record<string, unknown>).x).toBe(42);
@@ -187,17 +187,17 @@ describe('deepCleanUndefined', () => {
 
 // ─── Integration: deferred → undefined → cleanup ────────────────────
 
-describe('deepCleanUndefined integration with deferred', () => {
-    it('deferred resolving to undefined is cleaned in applyOverlays', () => {
+describe('deepCleanUndefined integration with defer', () => {
+    it('defer resolving to undefined is cleaned in applyOverlays', () => {
         const result = applyOverlays({}, [
-            () => ({ a: 1, b: deferred(() => undefined) }),
+            () => ({ a: 1, b: defer(() => undefined) }),
         ]);
         expect(result).toEqual({ a: 1 });
     });
 
     it('existing behavior not broken: normal values preserved', () => {
         const result = applyOverlays({}, [
-            () => ({ a: 1, b: deferred(() => 2), c: [3] }),
+            () => ({ a: 1, b: defer(() => 2), c: [3] }),
         ]);
         expect(result).toEqual({ a: 1, b: 2, c: [3] });
     });
@@ -205,13 +205,13 @@ describe('deepCleanUndefined integration with deferred', () => {
 
 describe('resolveDeferredAsync', () => {
     it('resolves async deferred values', async () => {
-        await expect(resolveDeferredAsync(deferred(async () => 42))).resolves.toBe(42);
+        await expect(resolveDeferredAsync(defer(async () => 42))).resolves.toBe(42);
     });
 
     it('resolves nested async deferred values', async () => {
         const obj = {
-            a: deferred(async () => 1),
-            b: { c: deferred(async () => 2) },
+            a: defer(async () => 1),
+            b: { c: defer(async () => 2) },
         };
         await expect(resolveDeferredAsync(obj)).resolves.toEqual({ a: 1, b: { c: 2 } });
     });

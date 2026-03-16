@@ -1,18 +1,18 @@
 // tests/mkmerge.test.ts — Tests for mkMerge multi-definition merge
 import { describe, it, expect } from 'vitest';
 import {
-    mkMerge, mkIf, deferred,
+    mkMerge, mkIf, defer,
     mkDefault, mkForce, mkOverride,
     mkOrder, mkBefore, mkAfter,
-    applyOverlays, moduleMerge,
+    applyOverlays, deepMerge,
 } from '../src/index.js';
 
-// Helper: apply overlays with moduleMerge
+// Helper: apply overlays with deepMerge
 function mergeWith(...overlays: Array<Record<string, unknown>>): Record<string, unknown> {
     return applyOverlays(
         {},
         overlays.map(o => () => o),
-        { merge: moduleMerge },
+        { merge: deepMerge },
     );
 }
 
@@ -74,21 +74,21 @@ describe('mkMerge — value mode', () => {
 describe('mkMerge — deferred definitions', () => {
     it('mix of concrete and deferred arrays', () => {
         const result = mergeWith({
-            packages: mkMerge([['vim'], deferred(() => ['firefox'])]),
+            packages: mkMerge([['vim'], defer(() => ['firefox'])]),
         });
         expect(result.packages).toEqual(['vim', 'firefox']);
     });
 
     it('deferred resolves to undefined is filtered', () => {
         const result = mergeWith({
-            packages: mkMerge([['vim'], deferred(() => undefined)]),
+            packages: mkMerge([['vim'], defer(() => undefined)]),
         });
         expect(result.packages).toEqual(['vim']);
     });
 
     it('all deferred resolve to undefined returns undefined (cleaned)', () => {
         const result = mergeWith({
-            packages: mkMerge([deferred(() => undefined), deferred(() => undefined)]),
+            packages: mkMerge([defer(() => undefined), defer(() => undefined)]),
         });
         expect(result.packages).toBeUndefined();
     });
@@ -107,7 +107,7 @@ describe('mkMerge — mkIf composition', () => {
                     mkIf(() => true, { packages: ['nginx'] }),
                 ]) as Record<string, unknown>,
             ],
-            { merge: moduleMerge },
+            { merge: deepMerge },
         );
         expect(result.packages).toEqual(['base', 'firefox', 'nginx']);
         expect(result.theme).toBe('dark');
@@ -123,7 +123,7 @@ describe('mkMerge — mkIf composition', () => {
                     mkIf(() => false, { packages: ['nginx'] }),
                 ]) as Record<string, unknown>,
             ],
-            { merge: moduleMerge },
+            { merge: deepMerge },
         );
         expect(result.packages).toEqual(['base']);
         expect(result.theme).toBeUndefined();
@@ -159,7 +159,7 @@ describe('mkMerge — cross-module merge', () => {
                     ]),
                 }),
             ],
-            { merge: moduleMerge },
+            { merge: deepMerge },
         );
         expect(result.packages).toEqual(['early', 'base', 'late']);
     });

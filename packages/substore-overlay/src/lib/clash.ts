@@ -2,8 +2,8 @@
 // Clash/Mihomo-specific helpers for override modules.
 // Contains: URL/icon helpers, ruleset helpers, proxy group helpers.
 
-import { deferred } from 'libmodule';
-import type { Deferred } from 'libmodule';
+import { defer } from 'libmodule';
+import type { DeferProxy } from 'libmodule';
 
 // ─── URL / Icon Helpers ─────────────────────────────────────────────
 
@@ -107,7 +107,7 @@ export interface ProxyGroup {
     interval?: number;
     tolerance?: number;
     'max-failed-times'?: number;
-    proxies?: string[] | Deferred<string[]>;
+    proxies?: string[] | DeferProxy<string[]>;
     icon?: string;
     filter?: string;
     'exclude-filter'?: string;
@@ -163,7 +163,7 @@ export function trafficGroup(
         ...GROUP_COMMON,
         name,
         icon,
-        proxies: deferred(() =>
+        proxies: defer(() =>
             reorderProxies(final._allSelectables ?? [], defaultProxy),
         ),
         ...overrides,
@@ -184,7 +184,7 @@ export function generalGroup(
     return {
         ...GROUP_COMMON,
         name,
-        proxies: explicitProxies ?? deferred(() => final._proxies ?? []),
+        proxies: explicitProxies ?? defer(() => final._proxies ?? []),
         ...overrides,
     } as ProxyGroup;
 }

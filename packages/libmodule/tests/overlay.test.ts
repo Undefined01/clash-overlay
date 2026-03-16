@@ -1,10 +1,10 @@
 // tests/overlay.test.ts — Tests for applyOverlays and makeExtensible
 import { describe, it, expect } from 'vitest';
 import {
-    deferred,
+    defer,
     mkDefault,
     applyOverlays, applyOverlaysAsync, makeExtensible,
-    moduleMerge,
+    deepMerge,
 } from '../src/index.js';
 import type { MergeFn } from '../src/index.js';
 
@@ -55,7 +55,7 @@ describe('applyOverlays', () => {
                     (_final, prev) => ({ b: (prev.a as number) + 1, c: 3 }),
                     (final) => ({
                         c: 10,
-                        d: deferred(() => (final.c as number) + (final.b as number)),
+                        d: defer(() => (final.c as number) + (final.b as number)),
                     }),
                 ],
             );
@@ -67,7 +67,7 @@ describe('applyOverlays', () => {
                 { proxies: ['p1'] },
                 [
                     (final) => ({
-                        count: deferred(() => (final.proxies as string[]).length),
+                        count: defer(() => (final.proxies as string[]).length),
                     }),
                     (_final, prev) => ({
                         proxies: [...(prev.proxies as string[]), 'p2', 'p3'],
@@ -83,7 +83,7 @@ describe('applyOverlays', () => {
                 { a: 1, b: 2 },
                 [
                     (final) => ({
-                        c: deferred(() => (final.a as number) + (final.b as number)),
+                        c: defer(() => (final.a as number) + (final.b as number)),
                     }),
                 ],
             );
@@ -95,8 +95,8 @@ describe('applyOverlays', () => {
                 { a: 1 },
                 [
                     (final) => ({
-                        b: deferred(() => (final.a as number) + 1),
-                        c: deferred(() => final.b),
+                        b: defer(() => (final.a as number) + 1),
+                        c: defer(() => final.b),
                     }),
                 ],
             );
@@ -129,11 +129,11 @@ describe('applyOverlays', () => {
                     () => ({ items: ['a'], port: mkDefault(100) }),
                     () => ({ items: ['b'] }),
                     (final) => ({
-                        count: deferred(() => (final.items as unknown[]).length),
-                        portPlus: deferred(() => (final.port as number) + 1),
+                        count: defer(() => (final.items as unknown[]).length),
+                        portPlus: defer(() => (final.port as number) + 1),
                     }),
                 ],
-                { merge: moduleMerge },
+                { merge: deepMerge },
             );
             expect(result.items).toEqual(['a', 'b']);
             expect(result.count).toBe(2);
@@ -186,7 +186,7 @@ describe('applyOverlaysAsync', () => {
             { base: 40 },
             [
                 (final) => ({
-                    answer: deferred(async () => (final.base as number) + 2),
+                    answer: defer(async () => (final.base as number) + 2),
                 }),
             ],
         );
@@ -214,7 +214,7 @@ describe('makeExtensible', () => {
         let obj = makeExtensible({ a: 1 });
         obj = obj.extend((_final, prev) => ({ b: (prev.a as number) + 1 }));
         obj = obj.extend((final) => ({
-            c: deferred(() => (final.a as number) + (final.b as number)),
+            c: defer(() => (final.a as number) + (final.b as number)),
         }));
         expect(obj.c).toBe(3);
     });

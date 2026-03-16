@@ -6,7 +6,7 @@ import {
     GROUP_COMMON, PRIMITIVE_GROUPS,
     reorderProxies, trafficGroup, generalGroup,
 } from '../src/lib/clash.js';
-import { isDeferred, resolveDeferred } from 'libmodule';
+import { isDefer, resolveDeferred } from 'libmodule';
 
 // ─── URL / Icon Helpers ─────────────────────────────────────────────
 
@@ -148,7 +148,7 @@ describe('trafficGroup', () => {
         });
 
         expect(group.name).toBe('Streaming');
-        expect(isDeferred(group.proxies)).toBe(true);
+        expect(isDefer(group.proxies)).toBe(true);
         expect(resolveDeferred(group.proxies)).toEqual(['US', 'HK', 'JP']);
     });
 });
@@ -157,7 +157,7 @@ describe('generalGroup', () => {
     it('creates group with deferred proxies from _proxies', () => {
         const final = { _proxies: ['p1', 'p2'] };
         const group = generalGroup(final, { name: 'Manual' });
-        expect(isDeferred(group.proxies)).toBe(true);
+        expect(isDefer(group.proxies)).toBe(true);
         expect(resolveDeferred(group.proxies)).toEqual(['p1', 'p2']);
     });
 

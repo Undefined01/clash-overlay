@@ -10,6 +10,7 @@
 // Lower priority number = higher precedence.
 // Two values at the same priority with different content → error.
 
+import { MARKER } from './symbols.js';
 import type { Override } from './types.js';
 
 /** Priority for bare (unwrapped) scalar values. */
@@ -29,7 +30,7 @@ export const MKFORCE_PRIORITY = 50;
  * @param value    - The value to wrap
  */
 export function mkOverride<T>(priority: number, value: T): Override<T> {
-    return { __type: 'override', priority, value };
+    return { [MARKER]: 'override', priority, value };
 }
 
 /**
@@ -53,7 +54,7 @@ export function isOverride(val: unknown): val is Override {
     return (
         val !== null &&
         typeof val === 'object' &&
-        (val as Override).__type === 'override'
+        (val as Record<symbol, unknown>)[MARKER] === 'override'
     );
 }
 

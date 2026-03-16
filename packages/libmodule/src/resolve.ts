@@ -2,9 +2,10 @@
 // Recursively resolve deferred values, unwrap priority wrappers,
 // and flatten ordered lists.
 
-import { isDeferred } from './deferred.js';
+import { isDefer, forceDefer } from './defer.js';
 import { isOverride } from './priority.js';
 import { isOrdered, isOrderedList } from './order.js';
+import { isPlainObject, isPromiseLike } from './core-merge.js';
 import type { OrderedList } from './types.js';
 
 /**
@@ -12,7 +13,7 @@ import type { OrderedList } from './types.js';
  * resolvers, without evaluating deferred values.
  *
  * This unwraps priority wrappers and flattens ordered lists into plain arrays,
- * while leaving `deferred()` wrappers intact.
+ * while leaving defer proxies intact.
  */
 export function normalizeFinal(obj: unknown, visited: WeakSet<object> = new WeakSet()): unknown {
     if (obj === null || obj === undefined) return obj;
@@ -20,8 +21,8 @@ export function normalizeFinal(obj: unknown, visited: WeakSet<object> = new Weak
     if (isOverride(obj)) {
         return normalizeFinal(obj.value, visited);
     }
-    if (isDeferred(obj)) {
-        return obj;
+    if (isDefer(obj)) {
+        return obj; // leave defer proxies intact for resolve phase
     }
     if (isOrderedList(obj)) {
         return flattenOrderedListShallow(obj, visited);
@@ -39,8 +40,10 @@ export function normalizeFinal(obj: unknown, visited: WeakSet<object> = new Weak
         return obj.map((item) => normalizeFinal(item, visited));
     }
 
+    if (!isPlainObject(obj)) return obj;
+
     const normalized: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+    for (const [key, value] of Object.entries(obj)) {
         normalized[key] = normalizeFinal(value, visited);
     }
     return normalized;
@@ -56,8 +59,8 @@ export function resolveDeferred(obj: unknown, visited: WeakSet<object> = new Wea
     if (isOverride(obj)) {
         return resolveDeferred(obj.value, visited);
     }
-    if (isDeferred(obj)) {
-        const resolved = obj.fn();
+    if (isDefer(obj)) {
+        const resolved = forceDefer(obj);
         if (isPromiseLike(resolved)) {
             throw new Error('Deferred resolver returned Promise in sync mode. Use resolveDeferredAsync.');
         }
@@ -79,8 +82,10 @@ export function resolveDeferred(obj: unknown, visited: WeakSet<object> = new Wea
         return obj.map((item) => resolveDeferred(item, visited));
     }
 
+    if (!isPlainObject(obj)) return obj;
+
     const resolved: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+    for (const [key, value] of Object.entries(obj)) {
         resolved[key] = resolveDeferred(value, visited);
     }
     return resolved;
@@ -98,8 +103,9 @@ export async function resolveDeferredAsync(
     if (isOverride(obj)) {
         return resolveDeferredAsync(obj.value, visited);
     }
-    if (isDeferred(obj)) {
-        return resolveDeferredAsync(await obj.fn(), visited);
+    if (isDefer(obj)) {
+        const resolved = forceDefer(obj);
+        return resolveDeferredAsync(resolved instanceof Promise ? await resolved : resolved, visited);
     }
     if (isOrderedList(obj)) {
         return flattenOrderedListAsync(obj, visited);
@@ -118,8 +124,10 @@ export async function resolveDeferredAsync(
         return resolved;
     }
 
+    if (!isPlainObject(obj)) return obj;
+
     const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+    for (const [key, value] of Object.entries(obj)) {
         result[key] = await resolveDeferredAsync(value, visited);
     }
     return result;
@@ -171,15 +179,6 @@ async function flattenOrderedListAsync(
         }
     }
     return items;
-}
-
-function isPromiseLike<T = unknown>(value: unknown): value is PromiseLike<T> {
-    return (
-        typeof value === 'object' &&
-        value !== null &&
-        'then' in value &&
-        typeof (value as { then?: unknown }).then === 'function'
-    );
 }
 
 // ─── Undefined Cleanup ──────────────────────────────────────────────
