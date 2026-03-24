@@ -1,12 +1,11 @@
-// substore-overlay/src/modules/base-groups.ts — 基础代理组
-
 import type { ModuleArgs } from 'libmodule';
-import { mkBefore, mkOrder } from 'libmodule';
+import { mkBefore, mkMerge, mkOrder } from 'libmodule';
 import {
-    miniIcon, qureIcon, externalIcon,
+    miniIcon, qureIcon,
     generalGroup, PRIMITIVE_GROUPS,
 } from '../lib/clash.js';
 import type { ModuleContext } from './lib.js';
+import { proxyInsertionOrder } from './order.js';
 
 export default function baseGroupsModule(
     args: ModuleArgs,
@@ -21,12 +20,16 @@ export default function baseGroupsModule(
 
     return {
         proxies: ctx.originalConfig.proxies,
+        _generalProxies: proxies,
         _allSelectables: [...generalGroupNames, ...PRIMITIVE_GROUPS, ...proxies],
 
         'proxy-groups': mkBefore([
             generalGroup(config, {
                 name: '手动选择',
-                proxies: [...PRIMITIVE_GROUPS, ...proxies],
+                proxies: mkMerge([
+                    mkOrder(proxyInsertionOrder('base-groups.manual-select'), ['延迟测试', '负载均衡']),
+                    [...PRIMITIVE_GROUPS, ...proxies],
+                ]),
                 icon: miniIcon('Static'),
             }),
             generalGroup(config, {
@@ -42,18 +45,6 @@ export default function baseGroupsModule(
                 proxies,
                 icon: qureIcon('Round_Robin'),
             }),
-            generalGroup(config, {
-                name: '国外 AI',
-                type: 'url-test',
-                proxies,
-                filter:
-                    '(?i)🇸🇬|新加坡|SG|Singapore|🇯🇵|日本|JP|Japan|🇰🇷|韩国|KR|Korea|🇺🇲|美国|US|America|United States',
-                'exclude-filter':
-                    '(?i)香港|HK|Hong Kong|台湾|TW|Tai Wan|官网|TG|节点|到期|流量|返利|订阅',
-                icon: externalIcon('Nts60kQIvGqe'),
-            }),
-            // 向手动选择组添加延迟测试和负载均衡（通过 keyedListOf 按 name 合并）
-            { name: '手动选择', proxies: mkOrder(100, ['延迟测试', '负载均衡']) },
         ]),
     };
 }

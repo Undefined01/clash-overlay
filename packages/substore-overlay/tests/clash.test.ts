@@ -51,6 +51,12 @@ describe('makeRuleProvider', () => {
         expect(provider.behavior).toBe('domain');
     });
 
+    it('detects ipcidr behavior case-insensitively', () => {
+        const { name, provider } = makeRuleProvider('O', 'R', 'main', 'rules/netflixIp.mrs');
+        expect(name).toBe('netflixIp');
+        expect(provider.behavior).toBe('ipcidr');
+    });
+
     it('creates .yaml provider with classical behavior', () => {
         const { provider } = makeRuleProvider('O', 'R', 'main', 'rules/custom.yaml');
         expect(provider.format).toBe('yaml');
@@ -92,6 +98,21 @@ describe('rulesetRule', () => {
 
     it('supports multiple options', () => {
         expect(rulesetRule('p', 'G', 'no-resolve', 'src')).toBe('RULE-SET,p,G,no-resolve,src');
+    });
+
+    it('accepts RuleProviderEntry directly', () => {
+        const provider = dustinRule('proxy');
+        expect(rulesetRule(provider, 'PROXY')).toBe('RULE-SET,proxy,PROXY');
+    });
+
+    it('auto-appends no-resolve for ipcidr RuleProviderEntry', () => {
+        const provider = dustinRule('telegramip');
+        expect(rulesetRule(provider, 'PROXY')).toBe('RULE-SET,telegramip,PROXY,no-resolve');
+    });
+
+    it('does not duplicate no-resolve when already provided', () => {
+        const provider = dustinRule('telegramip');
+        expect(rulesetRule(provider, 'PROXY', 'no-resolve')).toBe('RULE-SET,telegramip,PROXY,no-resolve');
     });
 });
 

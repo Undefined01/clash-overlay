@@ -50,6 +50,7 @@ export function mkForce<T>(value: T): Override<T> {
 }
 
 /** Check if a value is an Override wrapper. */
+export function isOverride<T>(val: Override<T> | T): val is Override<T>;
 export function isOverride(val: unknown): val is Override {
     return (
         val !== null &&
@@ -63,11 +64,13 @@ export function isOverride(val: unknown): val is Override {
  * Override wrappers return their numeric priority;
  * bare values return DEFAULT_PRIORITY (100).
  */
+export function getPriority<T>(val: Override<T> | T): number;
 export function getPriority(val: unknown): number {
     return isOverride(val) ? val.priority : DEFAULT_PRIORITY;
 }
 
 /** Unwrap an Override wrapper, returning the raw value. */
+export function unwrapPriority<T>(val: Override<T> | T): T;
 export function unwrapPriority(val: unknown): unknown {
     return isOverride(val) ? val.value : val;
 }

@@ -65,7 +65,7 @@ export function defer<T>(fn: () => T): DeferProxy<T> {
 }
 
 /** Check if a value is a defer proxy. */
-export function isDefer(val: unknown): val is DeferProxy {
+export function isDefer<T>(val: DeferProxy<T> | T): val is DeferProxy<T> {
     return val !== null && typeof val === 'object' && DEFER_SYMBOL in (val as object);
 }
 

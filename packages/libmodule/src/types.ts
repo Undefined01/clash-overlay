@@ -2,6 +2,7 @@
 // Core type definitions for the Nix-style overlay system.
 
 import type { MARKER } from './symbols.js';
+import type { DeferProxy } from './defer.js';
 
 // ─── Priority (Nix-compatible) ──────────────────────────────────────
 
@@ -33,6 +34,49 @@ export interface OrderedList<T = unknown> {
     readonly [MARKER]: 'order-list';
     readonly segments: Array<{ order: number; items: T[] }>;
 }
+
+export type Defined<T> = Exclude<T, undefined>;
+
+export type MaybePromise<T> = T | Promise<T>;
+
+export type MergeKeys<T> = T extends T ? keyof T : never;
+
+export type MergeStringKeys<T> = Extract<MergeKeys<T>, string>;
+
+export type MergeValueAt<T, K extends PropertyKey> =
+    T extends T
+        ? K extends keyof T
+            ? T[K]
+            : never
+        : never;
+
+export type ArrayLikeValue<T> = Array<T | Ordered<T>> | Ordered<T> | OrderedList<T>;
+
+export type MergeArrayItem<T> =
+    T extends readonly (infer U)[]
+        ? U
+        : T extends Ordered<infer U>
+            ? U
+            : T extends OrderedList<infer U>
+                ? U
+                : never;
+
+export type MkMergeObjectResult<T extends object> = {
+    [K in MergeKeys<T>]?: MkMergeResult<Defined<MergeValueAt<T, K>>>;
+};
+
+type MkMergeDerived<T> =
+    [MergeArrayItem<T>] extends [never]
+        ? T extends object
+            ? MkMergeObjectResult<T>
+            : never
+        : OrderedList<MergeArrayItem<T>>;
+
+export type MkMergeValue<T> = Defined<T> | MkMergeDerived<Defined<T>> | undefined;
+
+export type MkMergeAsyncValue<T> = MaybePromise<MkMergeValue<T>>;
+
+export type MkMergeResult<T> = MkMergeValue<T> | DeferProxy<MkMergeAsyncValue<T>>;
 
 // ─── Overlay System ─────────────────────────────────────────────────
 

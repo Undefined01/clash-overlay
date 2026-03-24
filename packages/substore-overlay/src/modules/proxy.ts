@@ -1,33 +1,33 @@
-// substore-overlay/src/modules/proxy.ts — 国外代理 + 漏网之鱼 兜底
-
 import { dustinRule, rulesetRule, trafficGroup, qureIcon } from '../lib/clash.js';
-import { mkOrder, mkAfter } from 'libmodule';
+import { mkOrder, mkAfter, mkMerge } from 'libmodule';
 import type { ModuleArgs } from 'libmodule';
+import { proxyGroupOrder, ruleOrder } from './order.js';
 
 export default function proxyModule(
     { config }: ModuleArgs,
 ): Record<string, unknown> {
+    const cn = dustinRule('cn');
     const proxy = dustinRule('proxy');
     const networktest = dustinRule('networktest');
     const tldProxy = dustinRule('tld-proxy');
     const telegramIp = dustinRule('telegramip');
 
     return {
-        'proxy-groups': mkOrder(1100, [
+        'proxy-groups': mkOrder(proxyGroupOrder('proxy'), [
             trafficGroup(config, '国外代理', { defaultProxy: '手动选择', icon: qureIcon('Global') }),
             trafficGroup(config, '漏网之鱼', { defaultProxy: '手动选择', icon: qureIcon('Final') }),
         ]),
 
-        rules: [
-            mkOrder(1100, [
-                rulesetRule(networktest.name, '国外代理'),
-                rulesetRule(tldProxy.name, '国外代理'),
-                rulesetRule(proxy.name, '国外代理'),
-                rulesetRule('cn', '国内直连'),
-                rulesetRule(telegramIp.name, '国外代理', 'no-resolve'),
+        rules: mkMerge([
+            mkOrder(ruleOrder('proxy'), [
+                rulesetRule(networktest, '国外代理'),
+                rulesetRule(tldProxy, '国外代理'),
+                rulesetRule(proxy, '国外代理'),
+                rulesetRule(cn, '国内直连'),
+                rulesetRule(telegramIp, '国外代理'),
             ]),
             mkAfter(['MATCH,漏网之鱼']),
-        ],
+        ]),
 
         'rule-providers': {
             [proxy.name]: proxy.provider,

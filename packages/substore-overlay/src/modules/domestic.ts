@@ -1,39 +1,33 @@
-// substore-overlay/src/modules/domestic.ts — 国内直连
-
 import {
-    makeRuleProvider, dustinRule, rulesetRule,
+    dustinRule, rulesetRule,
     trafficGroup, miniIcon,
 } from '../lib/clash.js';
 import { mkOrder } from 'libmodule';
 import type { ModuleArgs } from 'libmodule';
+import { proxyGroupOrder, ruleOrder } from './order.js';
 
 export default function domesticModule(
     { config }: ModuleArgs,
 ): Record<string, unknown> {
     const cn = dustinRule('cn');
     const cnIp = dustinRule('cnip');
-    const apps = makeRuleProvider(
-        'DustinWin', 'ruleset_geodata', 'mihomo-ruleset',
-        'applications.list',
-    );
     const cnVendors = ['microsoft-cn', 'apple-cn', 'google-cn', 'games-cn']
         .map(name => dustinRule(name));
 
     return {
-        'proxy-groups': mkOrder(800, [
+        'proxy-groups': mkOrder(proxyGroupOrder('domestic'), [
             trafficGroup(config, '国内直连', { defaultProxy: 'DIRECT', icon: miniIcon('China') }),
         ]),
 
-        rules: mkOrder(800, [
-            rulesetRule(apps.name, '国内直连'),
-            ...cnVendors.map(r => rulesetRule(r.name, '国内直连')),
-            rulesetRule(cnIp.name, '国内直连', 'no-resolve'),
+        rules: mkOrder(ruleOrder('domestic'), [
+            ...cnVendors.map(r => rulesetRule(r, '国内直连')),
+            rulesetRule(cn, '国内直连'),
+            rulesetRule(cnIp, '国内直连'),
         ]),
 
         'rule-providers': {
             [cn.name]: cn.provider,
             [cnIp.name]: cnIp.provider,
-            [apps.name]: apps.provider,
             ...Object.fromEntries(cnVendors.map(r => [r.name, r.provider])),
         },
     };

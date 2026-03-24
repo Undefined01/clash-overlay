@@ -24,8 +24,9 @@ export default function dnsModule(
     ];
 
     const trustedDns = [
-        'https://cloudflare-dns.com/dns-query#proxy&ecs=120.76.0.0/14&ecs-override=true',
-        'https://dns.google/dns-query#proxy&ecs=120.76.0.0/14&ecs-override=true',
+        'https://000000.dns.nextdns.io/dns-query#h3=false&ecs=120.76.0.0/14&ecs-override=true',
+        'https://cloudflare-dns.com/dns-query#h3=false&proxy&ecs=120.76.0.0/14&ecs-override=true',
+        'https://dns.google/dns-query#h3=false&proxy&ecs=120.76.0.0/14&ecs-override=true',
     ];
 
     const fakeipFilter = dustinRule('fakeip-filter');
@@ -43,7 +44,7 @@ export default function dnsModule(
             enable: true,
             ipv6: ipv6Enabled,
             'enhanced-mode': dnsMode,
-            'prefer-h3': true,
+            'prefer-h3': false,
             'use-hosts': true,
             'use-system-hosts': true,
             'respect-rules': false,

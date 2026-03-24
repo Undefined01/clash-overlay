@@ -1,4 +1,5 @@
 // tests/integration.test.ts — Full override pipeline integration tests
+import { readFileSync, writeFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { mergeList } from '../src/lib/helpers.js';
 import {
@@ -12,6 +13,8 @@ import {
     trafficGroup, generalGroup, rulesetRule, dustinRule,
     miniIcon, qureIcon,
 } from '../src/lib/clash.js';
+import overrideMain from '../src/entrypoints/override.js';
+import type { ClashMetaConfig } from '../src/types/clash_meta_config.js';
 
 // ─── Minimal fixture modules ────────────────────────────────────────
 
@@ -98,6 +101,55 @@ function runModules(
         modules,
     ));
 }
+
+function runOverride(config: ClashMetaConfig): Record<string, unknown> {
+    return stripMetadata(overrideMain(config) as unknown as Record<string, unknown>);
+}
+
+const sampleOverrideConfig: ClashMetaConfig = {
+    proxies: [
+        {
+            name: 'HK Transit 01',
+            type: 'ss',
+            server: 'hk.example.com',
+            port: 443,
+            cipher: 'aes-128-gcm',
+            password: 'password-hk',
+            udp: true,
+            _nodeInfo: { countryCode: 'HK', tags: ['中转'] },
+        },
+        {
+            name: 'US Landing 01',
+            type: 'ss',
+            server: 'us.example.com',
+            port: 443,
+            cipher: 'aes-128-gcm',
+            password: 'password-us',
+            udp: true,
+            _nodeInfo: { countryCode: 'US', tags: ['落地'] },
+        },
+        {
+            name: 'SG Home 01',
+            type: 'ss',
+            server: 'sg.example.com',
+            port: 443,
+            cipher: 'aes-128-gcm',
+            password: 'password-sg',
+            udp: true,
+            _nodeInfo: { countryCode: 'SG', tags: ['家宽'] },
+        },
+        {
+            name: 'JP Forward 01',
+            type: 'ss',
+            server: 'jp.example.com',
+            port: 8443,
+            cipher: 'aes-256-gcm',
+            password: 'password-jp',
+            udp: true,
+            _nodeInfo: { countryCode: 'JP', tags: [] },
+        },
+    ],
+};
 
 // ─── Full pipeline ──────────────────────────────────────────────────
 
@@ -251,5 +303,21 @@ describe('mergeList in module context', () => {
         );
 
         expect(rules).toEqual(['DST-PORT,22,SSH', 'MATCH,PROXY']);
+    });
+});
+
+describe('override.ts full output', () => {
+    it('matches the reference config for the sample proxies', () => {
+        const result = runOverride(sampleOverrideConfig);
+        const actual = JSON.stringify(result, null, 2);
+        const expectedUrl = new URL('./fixtures/override-full.expected.json', import.meta.url);
+
+        if (process.env.UPDATE_OVERRIDE_FIXTURE === '1') {
+            writeFileSync(expectedUrl, `${actual}\n`);
+        }
+
+        const expected = readFileSync(expectedUrl, 'utf8').trimEnd();
+
+        expect(actual).toBe(expected);
     });
 });

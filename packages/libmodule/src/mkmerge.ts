@@ -10,16 +10,46 @@ import { getPriority, unwrapPriority } from './priority.js';
 import { isPlainObject, isPromiseLike, coreDeepMerge, scalarLastWins, toSegments } from './core-merge.js';
 import { isArrayLike } from './order.js';
 import { MARKER } from './symbols.js';
-import type { OrderedList } from './types.js';
+import type {
+    ArrayLikeValue,
+    Defined,
+    MergeArrayItem,
+    MergeStringKeys,
+    MergeValueAt,
+    MkMergeAsyncValue,
+    MkMergeObjectResult,
+    MkMergeResult,
+    MkMergeValue,
+    OrderedList,
+} from './types.js';
 
-function priorityMerge(key: string, cur: unknown, ext: unknown): unknown {
-    if (ext === undefined) return cur;
-    if (cur === undefined) {
-        if (isArrayLike(ext)) {
-            return { [MARKER]: 'order-list', segments: toSegments(ext) } as unknown as OrderedList;
-        }
-        return ext;
-    }
+export type MergeWrapper<T> = MkMergeResult<T>;
+
+type MergeComparable<T> = Exclude<MkMergeValue<T>, undefined>;
+
+type MergeObjectBuckets<T extends object> = Partial<{
+    [K in MergeStringKeys<T>]: Array<MergeValueAt<T, K>>;
+}>;
+
+function isDefined<T>(value: T): value is Defined<T> {
+    return value !== undefined;
+}
+
+function makeOrderedList<T>(segments: OrderedList<T>['segments']): OrderedList<T> {
+    return { [MARKER]: 'order-list', segments };
+}
+
+function toOrderedSegments<T>(value: ArrayLikeValue<T>): OrderedList<T>['segments'] {
+    return toSegments(value) as OrderedList<T>['segments'];
+}
+
+function objectEntries<T extends object>(
+    obj: T,
+): Array<[MergeStringKeys<T>, MergeValueAt<T, MergeStringKeys<T>>]> {
+    return Object.entries(obj) as Array<[MergeStringKeys<T>, MergeValueAt<T, MergeStringKeys<T>>]>;
+}
+
+function priorityMerge<T>(key: string, cur: MergeComparable<T>, ext: MergeComparable<T>): MergeComparable<T> {
 
     // Arrays: ordered concat
     const curIsArr = isArrayLike(cur);
@@ -30,9 +60,10 @@ function priorityMerge(key: string, cur: unknown, ext: unknown): unknown {
                 `Type mismatch for "${key}": cannot merge array with non-array`,
             );
         }
-        const curSegs = toSegments(cur);
-        const extSegs = toSegments(ext);
-        return { [MARKER]: 'order-list', segments: [...curSegs, ...extSegs] } as unknown as OrderedList;
+        type Item = MergeArrayItem<T>;
+        const curSegs = toOrderedSegments<Item>(cur as ArrayLikeValue<Item>);
+        const extSegs = toOrderedSegments<Item>(ext as ArrayLikeValue<Item>);
+        return makeOrderedList<Item>([...curSegs, ...extSegs]) as MergeComparable<T>;
     }
 
     // Unwrap priorities for value comparison
@@ -41,7 +72,7 @@ function priorityMerge(key: string, cur: unknown, ext: unknown): unknown {
 
     // Objects: deep merge
     if (isPlainObject(curVal) && isPlainObject(extVal)) {
-        return coreDeepMerge(key, curVal, extVal, scalarLastWins);
+        return coreDeepMerge(key, curVal, extVal, scalarLastWins) as MergeComparable<T>;
     }
 
     // Scalar conflict resolution (Nix-compatible)
@@ -62,11 +93,10 @@ function priorityMerge(key: string, cur: unknown, ext: unknown): unknown {
     return extPri < curPri ? ext : cur;
 }
 
-function foldValues(values: unknown[]): unknown {
-    if (values.length === 0) return undefined;
-    let acc = values[0];
+function foldValues<T>(values: Array<Defined<T>>): MergeComparable<T> {
+    let acc = values[0] as MergeComparable<T>;
     for (let i = 1; i < values.length; i++) {
-        acc = priorityMerge('mkMerge', acc, values[i]);
+        acc = priorityMerge('mkMerge', acc, values[i] as MergeComparable<T>);
     }
     return acc;
 }
@@ -75,62 +105,70 @@ function foldValues(values: unknown[]): unknown {
  * Merge values: fold definitions using priorityMerge.
  * If any definition is deferred, return a deferred that resolves all then folds.
  */
-function mkMergeValues(definitions: unknown[]): unknown {
+function mkMergeValues<T>(definitions: T[]): MkMergeResult<T> | undefined {
     const hasDeferred = definitions.some(d => isDefer(d));
 
     if (hasDeferred) {
-        return defer(() => {
+        return defer<MkMergeAsyncValue<T>>(() => {
             const resolved = definitions.map(d => isDefer(d) ? forceDefer(d) : d);
             if (resolved.some(isPromiseLike)) {
-                return Promise.all(resolved).then(vals =>
-                    foldValues(vals.filter(v => v !== undefined))
-                );
+                return Promise.all(
+                    resolved as Array<PromiseLike<Defined<T>> | Defined<T>>,
+                ).then(vals => {
+                    const defined = vals.filter(isDefined) as Array<Defined<T>>;
+                    return defined.length > 0 ? foldValues(defined) : undefined;
+                });
             }
-            return foldValues(resolved.filter(v => v !== undefined));
+            const defined = resolved.filter(isDefined) as Array<Defined<T>>;
+            return defined.length > 0 ? foldValues(defined) : undefined;
         });
     }
 
-    return foldValues(definitions.filter(v => v !== undefined));
+    const defined = definitions.filter(isDefined);
+    return defined.length > 0 ? foldValues(defined) : undefined;
 }
 
 /**
  * Merge objects: collect keys across all definitions, merge per-key.
  */
-function mkMergeObjects(definitions: Record<string, unknown>[]): Record<string, unknown> {
-    const keyValues = new Map<string, unknown[]>();
+function mkMergeObjects<T extends object>(definitions: T[]): MkMergeObjectResult<T> {
+    const keyValues: MergeObjectBuckets<T> = {};
 
     for (const obj of definitions) {
-        for (const [key, val] of Object.entries(obj)) {
-            if (!keyValues.has(key)) keyValues.set(key, []);
-            keyValues.get(key)!.push(val);
+        for (const [key, value] of objectEntries(obj)) {
+            const existing = keyValues[key] ?? [];
+            existing.push(value);
+            keyValues[key] = existing;
         }
     }
 
-    const result: Record<string, unknown> = {};
-    for (const [key, values] of keyValues) {
+    const result: Partial<MkMergeObjectResult<T>> = {};
+    for (const key of Object.keys(keyValues) as Array<MergeStringKeys<T>>) {
+        const values = keyValues[key];
+        if (!values || values.length === 0) continue;
         if (values.length === 1) {
-            result[key] = values[0];
+            result[key] = values[0] as MkMergeObjectResult<T>[typeof key];
         } else {
-            result[key] = mkMergeValues(values);
+            result[key] = mkMergeValues(values) as MkMergeObjectResult<T>[typeof key];
         }
     }
-    return result;
+    return result as MkMergeObjectResult<T>;
 }
 
 /**
  * Merge multiple definitions for the same key within a single module.
  */
-export function mkMerge(definitions: unknown[]): unknown {
+export function mkMerge<T>(definitions: T[]): MkMergeResult<T> | undefined {
     if (definitions.length === 0) return undefined;
 
-    const nonUndefined = definitions.filter(d => d !== undefined);
+    const nonUndefined = definitions.filter(isDefined);
     if (nonUndefined.length === 0) return undefined;
 
     const allObjects = nonUndefined.every(d => isPlainObject(d));
 
     if (allObjects) {
-        return mkMergeObjects(nonUndefined as Record<string, unknown>[]);
+        return mkMergeObjects(nonUndefined as Array<Defined<T> & object>) as MkMergeResult<T>;
     }
 
-    return mkMergeValues(nonUndefined);
+    return mkMergeValues(definitions);
 }

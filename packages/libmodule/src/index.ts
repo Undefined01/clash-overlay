@@ -3,9 +3,20 @@
 
 // Types
 export type {
+    Defined,
     Override,
     Ordered,
     OrderedList,
+    MaybePromise,
+    MergeKeys,
+    MergeStringKeys,
+    MergeValueAt,
+    ArrayLikeValue,
+    MergeArrayItem,
+    MkMergeObjectResult,
+    MkMergeValue,
+    MkMergeAsyncValue,
+    MkMergeResult,
     MergeFn,
     OverlayFn,
     AsyncOverlayFn,

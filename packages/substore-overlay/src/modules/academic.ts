@@ -1,11 +1,10 @@
-// substore-overlay/src/modules/academic.ts — 学术网站 + 种子 Trackers
-
 import {
     makeRuleProvider, dustinRule, rulesetRule,
     trafficGroup, externalIcon,
 } from '../lib/clash.js';
 import { mkOrder } from 'libmodule';
 import type { ModuleArgs } from 'libmodule';
+import { proxyGroupOrder, ruleOrder } from './order.js';
 
 export default function academicModule(
     { config }: ModuleArgs,
@@ -17,14 +16,14 @@ export default function academicModule(
     const trackers = dustinRule('trackerslist');
 
     return {
-        'proxy-groups': mkOrder(750, [
+        'proxy-groups': mkOrder(proxyGroupOrder('academic'), [
             trafficGroup(config, '学术网站', { defaultProxy: 'DIRECT', icon: externalIcon('114326') }),
             trafficGroup(config, '种子 Trackers', { defaultProxy: '手动选择', icon: externalIcon('tdQvZGPZFFuW') }),
         ]),
 
-        rules: mkOrder(750, [
-            rulesetRule(scholar.name, '学术网站'),
-            rulesetRule(trackers.name, '种子 Trackers'),
+        rules: mkOrder(ruleOrder('academic'), [
+            rulesetRule(scholar, '学术网站'),
+            rulesetRule(trackers, '种子 Trackers'),
         ]),
 
         'rule-providers': {

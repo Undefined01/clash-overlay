@@ -1,0 +1,799 @@
+{
+  "mixed-port": 7890,
+  "allow-lan": true,
+  "bind-address": "*",
+  "external-controller": "[::]:9093",
+  "secret": "8db22dfa-c425-42ca-8d1d-5e1a62e232ef",
+  "external-ui": "ui",
+  "external-ui-name": "yacd",
+  "external-ui-url": "https://github.com/haishanh/yacd/archive/refs/heads/gh-pages.zip",
+  "mode": "rule",
+  "ipv6": false,
+  "unified-delay": true,
+  "tcp-concurrent": true,
+  "find-process-mode": "strict",
+  "global-client-fingerprint": "chrome",
+  "profile": {
+    "store-selected": true,
+    "store-fake-ip": true
+  },
+  "geo-auto-update": true,
+  "geo-update-interval": 24,
+  "geox-url": {
+    "geoip": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-geodata/geoip.dat",
+    "geosite": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-geodata/geosite.dat",
+    "mmdb": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-geodata/Country.mmdb",
+    "asn": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-geodata/GeoLite2-ASN.mmdb"
+  },
+  "tun": {
+    "enable": true,
+    "stack": "mixed"
+  },
+  "sniffer": {
+    "enable": true,
+    "override-destination": true,
+    "force-dns-mapping": true,
+    "parse-pure-ip": true,
+    "sniff": {
+      "HTTP": {
+        "ports": [
+          80,
+          8080,
+          8880
+        ]
+      },
+      "TLS": {
+        "ports": [
+          443,
+          8443
+        ]
+      },
+      "QUIC": {
+        "ports": [
+          443,
+          8443
+        ]
+      }
+    },
+    "force-domain": [
+      "+.netflix.com",
+      "+.nflxvideo.net",
+      "+.amazonaws.com",
+      "+.media.dssott.com"
+    ],
+    "skip-domain": [
+      "+.apple.com",
+      "Mijia Cloud",
+      "dlg.io.mi.com",
+      "+.oray.com",
+      "+.sunlogin.net",
+      "+.push.apple.com"
+    ]
+  },
+  "hosts": {
+    "dns.alidns.com": [
+      "223.5.5.5",
+      "223.6.6.6",
+      "2400:3200::1",
+      "2400:3200:baba::1"
+    ],
+    "dns.pub": [
+      "119.29.29.29",
+      "1.12.12.12",
+      "2402:4e00::"
+    ]
+  },
+  "dns": {
+    "enable": true,
+    "ipv6": false,
+    "enhanced-mode": "fake-ip",
+    "prefer-h3": false,
+    "use-hosts": true,
+    "use-system-hosts": true,
+    "respect-rules": false,
+    "fake-ip-filter-mode": "blacklist",
+    "fake-ip-filter": [
+      "rule-set:fakeip-filter",
+      "rule-set:private",
+      "rule-set:cn"
+    ],
+    "direct-nameserver": [
+      "system",
+      "223.5.5.5",
+      "223.6.6.6",
+      "2400:3200::1",
+      "2400:3200:baba::1"
+    ],
+    "proxy-server-nameserver": [
+      "system",
+      "223.5.5.5",
+      "223.6.6.6",
+      "2400:3200::1",
+      "2400:3200:baba::1",
+      "https://doh.pub/dns-query",
+      "https://dns.alidns.com/dns-query"
+    ],
+    "nameserver": [
+      "https://000000.dns.nextdns.io/dns-query#h3=false&ecs=120.76.0.0/14&ecs-override=true",
+      "https://cloudflare-dns.com/dns-query#h3=false&proxy&ecs=120.76.0.0/14&ecs-override=true",
+      "https://dns.google/dns-query#h3=false&proxy&ecs=120.76.0.0/14&ecs-override=true"
+    ],
+    "nameserver-priority": {
+      "+.nju.edu.cn": "system"
+    }
+  },
+  "rule-providers": {
+    "fakeip-filter": {
+      "type": "http",
+      "behavior": "domain",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/fakeip-filter.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/fakeip-filter.mrs"
+    },
+    "private": {
+      "type": "http",
+      "behavior": "domain",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/private.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/private.mrs"
+    },
+    "ads": {
+      "type": "http",
+      "behavior": "domain",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/ads.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/ads.mrs"
+    },
+    "privateip": {
+      "type": "http",
+      "behavior": "ipcidr",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/privateip.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/privateip.mrs"
+    },
+    "applications": {
+      "type": "http",
+      "behavior": "classical",
+      "format": "text",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/applications.text",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/applications.list"
+    },
+    "scholar": {
+      "type": "http",
+      "behavior": "classical",
+      "format": "yaml",
+      "interval": 86400,
+      "path": "./ruleset/nerdneilsfield/scholar.yaml",
+      "url": "https://fastly.jsdelivr.net/gh/nerdneilsfield/clash_rules_for_scholar@master/rules/scholar.yaml"
+    },
+    "trackerslist": {
+      "type": "http",
+      "behavior": "domain",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/trackerslist.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/trackerslist.mrs"
+    },
+    "cn": {
+      "type": "http",
+      "behavior": "domain",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/cn.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/cn.mrs"
+    },
+    "cnip": {
+      "type": "http",
+      "behavior": "ipcidr",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/cnip.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/cnip.mrs"
+    },
+    "microsoft-cn": {
+      "type": "http",
+      "behavior": "domain",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/microsoft-cn.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/microsoft-cn.mrs"
+    },
+    "apple-cn": {
+      "type": "http",
+      "behavior": "domain",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/apple-cn.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/apple-cn.mrs"
+    },
+    "google-cn": {
+      "type": "http",
+      "behavior": "domain",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/google-cn.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/google-cn.mrs"
+    },
+    "games-cn": {
+      "type": "http",
+      "behavior": "domain",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/games-cn.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/games-cn.mrs"
+    },
+    "netflix": {
+      "type": "http",
+      "behavior": "domain",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/netflix.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/netflix.mrs"
+    },
+    "netflixIp": {
+      "type": "http",
+      "behavior": "ipcidr",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/netflixIp.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/netflixIp.mrs"
+    },
+    "disney": {
+      "type": "http",
+      "behavior": "domain",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/disney.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/disney.mrs"
+    },
+    "max": {
+      "type": "http",
+      "behavior": "domain",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/max.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/max.mrs"
+    },
+    "primevideo": {
+      "type": "http",
+      "behavior": "domain",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/primevideo.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/primevideo.mrs"
+    },
+    "appletv": {
+      "type": "http",
+      "behavior": "domain",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/appletv.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/appletv.mrs"
+    },
+    "youtube": {
+      "type": "http",
+      "behavior": "domain",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/youtube.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/youtube.mrs"
+    },
+    "tiktok": {
+      "type": "http",
+      "behavior": "domain",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/tiktok.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/tiktok.mrs"
+    },
+    "spotify": {
+      "type": "http",
+      "behavior": "domain",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/spotify.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/spotify.mrs"
+    },
+    "media": {
+      "type": "http",
+      "behavior": "domain",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/media.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/media.mrs"
+    },
+    "mediaIp": {
+      "type": "http",
+      "behavior": "ipcidr",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/mediaIp.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/mediaIp.mrs"
+    },
+    "games": {
+      "type": "http",
+      "behavior": "domain",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/games.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/games.mrs"
+    },
+    "gamesip": {
+      "type": "http",
+      "behavior": "ipcidr",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/gamesip.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/gamesip.mrs"
+    },
+    "ai": {
+      "type": "http",
+      "behavior": "domain",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/ai.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/ai.mrs"
+    },
+    "proxy": {
+      "type": "http",
+      "behavior": "domain",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/proxy.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/proxy.mrs"
+    },
+    "networktest": {
+      "type": "http",
+      "behavior": "domain",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/networktest.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/networktest.mrs"
+    },
+    "tld-proxy": {
+      "type": "http",
+      "behavior": "domain",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/tld-proxy.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/tld-proxy.mrs"
+    },
+    "telegramip": {
+      "type": "http",
+      "behavior": "ipcidr",
+      "format": "mrs",
+      "interval": 86400,
+      "path": "./ruleset/DustinWin/telegramip.mrs",
+      "url": "https://fastly.jsdelivr.net/gh/DustinWin/ruleset_geodata@mihomo-ruleset/telegramip.mrs"
+    }
+  },
+  "proxies": [
+    {
+      "name": "HK Transit 01",
+      "type": "ss",
+      "server": "hk.example.com",
+      "port": 443,
+      "cipher": "aes-128-gcm",
+      "password": "password-hk",
+      "udp": true,
+      "_nodeInfo": {
+        "countryCode": "HK",
+        "tags": [
+          "中转"
+        ]
+      }
+    },
+    {
+      "name": "US Landing 01",
+      "type": "ss",
+      "server": "us.example.com",
+      "port": 443,
+      "cipher": "aes-128-gcm",
+      "password": "password-us",
+      "udp": true,
+      "_nodeInfo": {
+        "countryCode": "US",
+        "tags": [
+          "落地"
+        ]
+      }
+    },
+    {
+      "name": "SG Home 01",
+      "type": "ss",
+      "server": "sg.example.com",
+      "port": 443,
+      "cipher": "aes-128-gcm",
+      "password": "password-sg",
+      "udp": true,
+      "_nodeInfo": {
+        "countryCode": "SG",
+        "tags": [
+          "家宽"
+        ]
+      }
+    },
+    {
+      "name": "JP Forward 01",
+      "type": "ss",
+      "server": "jp.example.com",
+      "port": 8443,
+      "cipher": "aes-256-gcm",
+      "password": "password-jp",
+      "udp": true,
+      "_nodeInfo": {
+        "countryCode": "JP",
+        "tags": []
+      }
+    },
+    {
+      "name": "easyconnect",
+      "type": "socks5",
+      "server": "127.0.0.1",
+      "port": 1080
+    }
+  ],
+  "proxy-groups": [
+    {
+      "type": "select",
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": 300,
+      "tolerance": 50,
+      "max-failed-times": 2,
+      "name": "手动选择",
+      "proxies": [
+        "延迟测试",
+        "负载均衡",
+        "落地代理",
+        "DIRECT",
+        "REJECT",
+        "HK Transit 01",
+        "US Landing 01",
+        "SG Home 01",
+        "JP Forward 01"
+      ],
+      "icon": "https://fastly.jsdelivr.net/gh/Orz-3/mini@master/Color/Static.png"
+    },
+    {
+      "type": "url-test",
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": 300,
+      "tolerance": 50,
+      "max-failed-times": 2,
+      "name": "延迟测试",
+      "proxies": [
+        "HK Transit 01",
+        "US Landing 01",
+        "SG Home 01",
+        "JP Forward 01"
+      ],
+      "icon": "https://fastly.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Auto.png"
+    },
+    {
+      "type": "load-balance",
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": 300,
+      "tolerance": 50,
+      "max-failed-times": 2,
+      "name": "负载均衡",
+      "proxies": [
+        "HK Transit 01",
+        "US Landing 01",
+        "SG Home 01",
+        "JP Forward 01"
+      ],
+      "strategy": "sticky-sessions",
+      "icon": "https://fastly.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Round_Robin.png"
+    },
+    {
+      "type": "url-test",
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": 300,
+      "tolerance": 50,
+      "max-failed-times": 2,
+      "name": "落地代理",
+      "proxies": [
+        "US Landing 01",
+        "SG Home 01",
+        "DIRECT",
+        "REJECT"
+      ],
+      "dialer-proxy": "落地前置",
+      "icon": "https://img.icons8.com/?size=100&id=ABvCfQAJ&format=png&color=000000"
+    },
+    {
+      "type": "select",
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": 300,
+      "tolerance": 50,
+      "max-failed-times": 2,
+      "name": "落地前置",
+      "proxies": [
+        "REJECT",
+        "DIRECT",
+        "HK Transit 01",
+        "SG Home 01",
+        "JP Forward 01"
+      ],
+      "icon": "https://img.icons8.com/?size=100&id=ABvCfQAJ&format=png&color=000000"
+    },
+    {
+      "type": "select",
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": 300,
+      "tolerance": 50,
+      "max-failed-times": 2,
+      "name": "校园网",
+      "icon": "https://img.icons8.com/?size=100&id=4XCV6mm0hqu3&format=png&color=000000",
+      "proxies": [
+        "DIRECT",
+        "手动选择",
+        "延迟测试",
+        "负载均衡",
+        "REJECT",
+        "HK Transit 01",
+        "US Landing 01",
+        "SG Home 01",
+        "JP Forward 01"
+      ]
+    },
+    {
+      "type": "select",
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": 300,
+      "tolerance": 50,
+      "max-failed-times": 2,
+      "name": "SSH 代理",
+      "proxies": [
+        "DIRECT",
+        "手动选择",
+        "延迟测试",
+        "负载均衡",
+        "REJECT",
+        "HK Transit 01",
+        "US Landing 01",
+        "SG Home 01",
+        "JP Forward 01"
+      ],
+      "icon": "https://img.icons8.com/?size=100&id=fSPmETYJKmmk&format=png&color=000000"
+    },
+    {
+      "type": "select",
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": 300,
+      "tolerance": 50,
+      "max-failed-times": 2,
+      "name": "私有网络",
+      "icon": "https://img.icons8.com/?size=100&id=123514&format=png&color=000000",
+      "proxies": [
+        "DIRECT",
+        "手动选择",
+        "延迟测试",
+        "负载均衡",
+        "REJECT",
+        "HK Transit 01",
+        "US Landing 01",
+        "SG Home 01",
+        "JP Forward 01"
+      ]
+    },
+    {
+      "type": "select",
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": 300,
+      "tolerance": 50,
+      "max-failed-times": 2,
+      "name": "广告",
+      "icon": "https://img.icons8.com/?size=100&id=4XCV6mm0hqu3&format=png&color=000000",
+      "proxies": [
+        "REJECT",
+        "手动选择",
+        "延迟测试",
+        "负载均衡",
+        "DIRECT",
+        "HK Transit 01",
+        "US Landing 01",
+        "SG Home 01",
+        "JP Forward 01"
+      ]
+    },
+    {
+      "type": "select",
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": 300,
+      "tolerance": 50,
+      "max-failed-times": 2,
+      "name": "学术网站",
+      "icon": "https://img.icons8.com/?size=100&id=114326&format=png&color=000000",
+      "proxies": [
+        "DIRECT",
+        "手动选择",
+        "延迟测试",
+        "负载均衡",
+        "REJECT",
+        "HK Transit 01",
+        "US Landing 01",
+        "SG Home 01",
+        "JP Forward 01"
+      ]
+    },
+    {
+      "type": "select",
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": 300,
+      "tolerance": 50,
+      "max-failed-times": 2,
+      "name": "种子 Trackers",
+      "icon": "https://img.icons8.com/?size=100&id=tdQvZGPZFFuW&format=png&color=000000",
+      "proxies": [
+        "手动选择",
+        "延迟测试",
+        "负载均衡",
+        "DIRECT",
+        "REJECT",
+        "HK Transit 01",
+        "US Landing 01",
+        "SG Home 01",
+        "JP Forward 01"
+      ]
+    },
+    {
+      "type": "select",
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": 300,
+      "tolerance": 50,
+      "max-failed-times": 2,
+      "name": "国内直连",
+      "icon": "https://fastly.jsdelivr.net/gh/Orz-3/mini@master/Color/China.png",
+      "proxies": [
+        "DIRECT",
+        "手动选择",
+        "延迟测试",
+        "负载均衡",
+        "REJECT",
+        "HK Transit 01",
+        "US Landing 01",
+        "SG Home 01",
+        "JP Forward 01"
+      ]
+    },
+    {
+      "type": "select",
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": 300,
+      "tolerance": 50,
+      "max-failed-times": 2,
+      "name": "流媒体",
+      "icon": "https://fastly.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Netflix.png",
+      "proxies": [
+        "手动选择",
+        "延迟测试",
+        "负载均衡",
+        "DIRECT",
+        "REJECT",
+        "HK Transit 01",
+        "US Landing 01",
+        "SG Home 01",
+        "JP Forward 01"
+      ]
+    },
+    {
+      "type": "select",
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": 300,
+      "tolerance": 50,
+      "max-failed-times": 2,
+      "name": "游戏平台",
+      "icon": "https://fastly.jsdelivr.net/gh/Orz-3/mini@master/Color/Steam.png",
+      "proxies": [
+        "手动选择",
+        "延迟测试",
+        "负载均衡",
+        "DIRECT",
+        "REJECT",
+        "HK Transit 01",
+        "US Landing 01",
+        "SG Home 01",
+        "JP Forward 01"
+      ]
+    },
+    {
+      "type": "url-test",
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": 300,
+      "tolerance": 50,
+      "max-failed-times": 2,
+      "name": "国外 AI",
+      "proxies": [
+        "HK Transit 01",
+        "US Landing 01",
+        "SG Home 01",
+        "JP Forward 01"
+      ],
+      "filter": "(?i)🇸🇬|新加坡|SG|Singapore|🇯🇵|日本|JP|Japan|🇰🇷|韩国|KR|Korea|🇺🇲|美国|US|America|United States",
+      "exclude-filter": "(?i)香港|HK|Hong Kong|台湾|TW|Tai Wan|官网|TG|节点|到期|流量|返利|订阅",
+      "icon": "https://img.icons8.com/?size=100&id=Nts60kQIvGqe&format=png&color=000000"
+    },
+    {
+      "type": "select",
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": 300,
+      "tolerance": 50,
+      "max-failed-times": 2,
+      "name": "国外代理",
+      "icon": "https://fastly.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Global.png",
+      "proxies": [
+        "手动选择",
+        "延迟测试",
+        "负载均衡",
+        "DIRECT",
+        "REJECT",
+        "HK Transit 01",
+        "US Landing 01",
+        "SG Home 01",
+        "JP Forward 01"
+      ]
+    },
+    {
+      "type": "select",
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": 300,
+      "tolerance": 50,
+      "max-failed-times": 2,
+      "name": "漏网之鱼",
+      "icon": "https://fastly.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Final.png",
+      "proxies": [
+        "手动选择",
+        "延迟测试",
+        "负载均衡",
+        "DIRECT",
+        "REJECT",
+        "HK Transit 01",
+        "US Landing 01",
+        "SG Home 01",
+        "JP Forward 01"
+      ]
+    }
+  ],
+  "rules": [
+    "IP-CIDR,172.29.0.0/16,校园网",
+    "IP-CIDR,142.171.5.135/32,DIRECT",
+    "DST-PORT,22,SSH 代理",
+    "RULE-SET,private,私有网络",
+    "RULE-SET,privateip,私有网络,no-resolve",
+    "RULE-SET,ads,广告",
+    "RULE-SET,applications,国内直连",
+    "RULE-SET,scholar,学术网站",
+    "RULE-SET,trackerslist,种子 Trackers",
+    "RULE-SET,ai,国外 AI",
+    "RULE-SET,netflix,流媒体",
+    "RULE-SET,netflixIp,流媒体,no-resolve",
+    "RULE-SET,disney,流媒体",
+    "RULE-SET,max,流媒体",
+    "RULE-SET,primevideo,流媒体",
+    "RULE-SET,appletv,流媒体",
+    "RULE-SET,youtube,流媒体",
+    "RULE-SET,tiktok,流媒体",
+    "RULE-SET,spotify,流媒体",
+    "RULE-SET,media,流媒体",
+    "RULE-SET,mediaIp,流媒体,no-resolve",
+    "RULE-SET,games,游戏平台",
+    "RULE-SET,gamesip,游戏平台,no-resolve",
+    "RULE-SET,microsoft-cn,国内直连",
+    "RULE-SET,apple-cn,国内直连",
+    "RULE-SET,google-cn,国内直连",
+    "RULE-SET,games-cn,国内直连",
+    "RULE-SET,cn,国内直连",
+    "RULE-SET,cnip,国内直连,no-resolve",
+    "RULE-SET,networktest,国外代理",
+    "RULE-SET,tld-proxy,国外代理",
+    "RULE-SET,proxy,国外代理",
+    "RULE-SET,telegramip,国外代理,no-resolve",
+    "MATCH,漏网之鱼"
+  ]
+}

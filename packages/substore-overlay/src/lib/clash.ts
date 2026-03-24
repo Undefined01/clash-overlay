@@ -3,7 +3,7 @@
 // Contains: URL/icon helpers, ruleset helpers, proxy group helpers.
 
 import { defer } from 'libmodule';
-import type { DeferProxy } from 'libmodule';
+import type { MkMergeResult, Ordered } from 'libmodule';
 
 // ─── URL / Icon Helpers ─────────────────────────────────────────────
 
@@ -51,7 +51,7 @@ export function makeRuleProvider(
     const match = path.match(/([\w\-_]+)\.(\w+)$/);
     if (!match) throw new Error(`Cannot extract name from path: ${path}`);
     const name = match[1];
-    let behavior = name.endsWith('ip') ? 'ipcidr' : 'domain';
+    let behavior = /ip$/i.test(name) ? 'ipcidr' : 'domain';
     let format: string;
 
     if (path.endsWith('.yaml')) {
@@ -93,8 +93,23 @@ export function dustinRule(name: string): RuleProviderEntry {
 /**
  * Create a RULE-SET rule string.
  */
-export function rulesetRule(rulesetName: string, proxy: string, ...options: string[]): string {
-    const optStr = options.map(opt => ',' + opt).join('');
+export function rulesetRule(
+    ruleset: string | RuleProviderEntry,
+    proxy: string,
+    ...options: string[]
+): string {
+    const rulesetName = typeof ruleset === 'string' ? ruleset : ruleset.name;
+    const normalizedOptions = [...options];
+
+    if (
+        typeof ruleset !== 'string'
+        && ruleset.provider.behavior === 'ipcidr'
+        && !normalizedOptions.includes('no-resolve')
+    ) {
+        normalizedOptions.push('no-resolve');
+    }
+
+    const optStr = normalizedOptions.map(opt => ',' + opt).join('');
     return `RULE-SET,${rulesetName},${proxy}${optStr}`;
 }
 
@@ -107,7 +122,7 @@ export interface ProxyGroup {
     interval?: number;
     tolerance?: number;
     'max-failed-times'?: number;
-    proxies?: string[] | DeferProxy<string[]>;
+    proxies?: MkMergeResult<string[] | Ordered<string>>;
     icon?: string;
     filter?: string;
     'exclude-filter'?: string;
@@ -142,6 +157,7 @@ export function reorderProxies(proxies: string[], defaultProxy: string | null): 
 /** State type used by the final proxy. */
 interface ClashState {
     _allSelectables?: string[];
+    _generalProxies?: string[];
     _proxies?: string[];
     [key: string]: unknown;
 }
@@ -177,7 +193,7 @@ export function generalGroup(
     final: ClashState,
     { name, proxies: explicitProxies, ...overrides }: {
         name: string;
-        proxies?: string[];
+        proxies?: MkMergeResult<string[] | Ordered<string>>;
         [key: string]: unknown;
     },
 ): ProxyGroup {
