@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { extractOptions, resolveOptionType, getOptionDefault } from '../src/options.js';
-import { types } from '../src/option-types.js';
+import { makeType, types } from '../src/option-types.js';
 
 describe('extractOptions', () => {
     it('extracts flat key declarations', () => {
@@ -74,6 +74,16 @@ describe('extractOptions', () => {
             { _options: { port: { type: types.str } } },
         ];
         expect(() => extractOptions(fragments as any)).toThrow('Conflicting _options type');
+    });
+
+    it('throws when two different OptionType instances share the same name', () => {
+        const first = makeType('portLike', (v) => typeof v === 'number', (key, defs) => defs[0]);
+        const second = makeType('portLike', (v) => typeof v === 'number', (key, defs) => defs[defs.length - 1]);
+        const fragments = [
+            { _options: { port: { type: first } } },
+            { _options: { port: { type: second } } },
+        ];
+        expect(() => extractOptions(fragments as any)).toThrow(/reuse the same OptionType instance/);
     });
 
     it('ignores fragments without _options', () => {

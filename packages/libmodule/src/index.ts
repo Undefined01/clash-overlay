@@ -3,19 +3,9 @@
 
 // Types
 export type {
-    Defined,
     Override,
     Ordered,
     OrderedList,
-    MaybePromise,
-    MergeKeys,
-    MergeStringKeys,
-    MergeValueAt,
-    ArrayLikeValue,
-    MergeArrayItem,
-    MkMergeObjectResult,
-    MkMergeValue,
-    MkMergeAsyncValue,
     MkMergeResult,
     MergeFn,
     OverlayFn,
@@ -30,7 +20,6 @@ export type {
 export type { OptionType } from './option-types.js';
 export type { OptionDeclaration } from './options.js';
 export type { DeferProxy } from './defer.js';
-export type { ScalarHandler } from './core-merge.js';
 
 // Symbols
 export { MARKER, DEFER_SYMBOL } from './symbols.js';

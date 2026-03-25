@@ -7,7 +7,12 @@
 // Boolean overload: eagerly returns value or {} when condition is a plain boolean.
 
 import { defer } from './defer.js';
+import type { DeferProxy } from './defer.js';
 import { isPlainObject } from './core-merge.js';
+
+type DeferredObject<T extends Record<string, unknown>> = {
+    [K in keyof T]: DeferProxy<T[K] | undefined>;
+};
 
 /**
  * Conditionally include configuration based on a boolean or boolean function.
@@ -21,16 +26,24 @@ import { isPlainObject } from './core-merge.js';
  * @param condition - Boolean or function returning boolean
  * @param value - Configuration fragment or value to conditionally include
  */
+export function mkIf<T extends Record<string, unknown>>(condition: true, value: T): T;
+export function mkIf<T extends Record<string, unknown>>(condition: false, value: T): {};
+export function mkIf<T extends Record<string, unknown>>(condition: boolean, value: T): T | {};
+export function mkIf<T extends Record<string, unknown>>(condition: () => boolean, value: T): DeferredObject<T>;
+export function mkIf<T>(condition: true, value: T): T;
+export function mkIf<T>(condition: false, value: T): undefined;
+export function mkIf<T>(condition: boolean, value: T): T | undefined;
+export function mkIf<T>(condition: () => boolean, value: T): DeferProxy<T | undefined>;
 export function mkIf<T>(
     condition: boolean | (() => boolean),
     value: T,
-): T extends Record<string, unknown> ? Record<string, unknown> : ReturnType<typeof defer> {
+): T | {} | undefined | DeferredObject<Record<string, unknown>> | DeferProxy<T | undefined> {
     // Eager boolean overload
     if (typeof condition === 'boolean') {
         if (isPlainObject(value)) {
-            return (condition ? value : {}) as any;
+            return condition ? value : {};
         }
-        return (condition ? value : undefined) as any;
+        return condition ? value : undefined;
     }
 
     // Lazy function overload
@@ -40,12 +53,12 @@ export function mkIf<T>(
             if (cached === undefined) cached = condition();
             return cached;
         };
-        const result: Record<string, unknown> = {};
+        const result = {} as DeferredObject<Record<string, unknown>>;
         for (const [key, val] of Object.entries(value)) {
             result[key] = defer(() => evalCond() ? val : undefined);
         }
-        return result as any;
+        return result;
     }
 
-    return defer(() => condition() ? value : undefined) as any;
+    return defer(() => condition() ? value : undefined);
 }

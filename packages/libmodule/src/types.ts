@@ -81,48 +81,62 @@ export type MkMergeResult<T> = MkMergeValue<T> | DeferProxy<MkMergeAsyncValue<T>
 // ─── Overlay System ─────────────────────────────────────────────────
 
 /** Merge function: combines current accumulated state with a new extension. */
-export type MergeFn = (
-    current: Record<string, unknown>,
-    extension: Record<string, unknown>,
-) => Record<string, unknown>;
+export type MergeFn<TState extends Record<string, unknown> = Record<string, unknown>> = (
+    current: Partial<TState>,
+    extension: Partial<TState>,
+) => Partial<TState>;
 
 /** Overlay function: receives final proxy and prev state, returns extension. */
-export type OverlayFn = (
-    final: Record<string, unknown>,
-    prev: Record<string, unknown>,
-) => Record<string, unknown>;
+export type OverlayFn<TState extends Record<string, unknown> = Record<string, unknown>> = (
+    final: TState,
+    prev: Partial<TState>,
+) => Partial<TState>;
 
 /** Async overlay function: may resolve extension asynchronously. */
-export type AsyncOverlayFn = (
-    final: Record<string, unknown>,
-    prev: Record<string, unknown>,
-) => Record<string, unknown> | Promise<Record<string, unknown>>;
+export type AsyncOverlayFn<TState extends Record<string, unknown> = Record<string, unknown>> = (
+    final: TState,
+    prev: Partial<TState>,
+) => MaybePromise<Partial<TState>>;
 
 /** Options for applyOverlays. */
-export interface ApplyOverlaysOptions {
-    merge?: MergeFn;
+export interface ApplyOverlaysOptions<TState extends Record<string, unknown> = Record<string, unknown>> {
+    merge?: MergeFn<TState>;
 }
 
 // ─── Module System ─────────────────────────────────────────────────
 
+type ReservedModuleArgs = {
+    config?: never;
+};
+
 /** Module args: config proxy plus any specialArgs. */
-export interface ModuleArgs {
-    config: Record<string, unknown>;
-    [key: string]: unknown;
-}
+export type ModuleArgs<
+    TArgs extends Record<string, unknown> & ReservedModuleArgs = {},
+    TConfig extends Record<string, unknown> = Record<string, unknown>,
+> = Omit<TArgs, 'config'> & {
+    readonly config: TConfig;
+};
 
 /** Module function: receives { config, ...specialArgs }, returns a config fragment. */
-export type ModuleFn = (args: ModuleArgs) => Record<string, unknown>;
+export type ModuleFn<
+    TArgs extends Record<string, unknown> & ReservedModuleArgs = {},
+    TConfig extends Record<string, unknown> = Record<string, unknown>,
+    TResult extends Record<string, unknown> = Record<string, unknown>,
+> = (args: ModuleArgs<TArgs, TConfig>) => TResult;
 
 /** Async module function: may return Promise. */
-export type AsyncModuleFn = (
-    args: ModuleArgs,
-) => Record<string, unknown> | Promise<Record<string, unknown>>;
+export type AsyncModuleFn<
+    TArgs extends Record<string, unknown> & ReservedModuleArgs = {},
+    TConfig extends Record<string, unknown> = Record<string, unknown>,
+    TResult extends Record<string, unknown> = Record<string, unknown>,
+> = (args: ModuleArgs<TArgs, TConfig>) => MaybePromise<TResult>;
 
 /** Options for evalModules / evalModulesAsync. */
-export interface EvalModulesOptions {
+export interface EvalModulesOptions<
+    TArgs extends Record<string, unknown> & ReservedModuleArgs = {},
+> {
     /** Additional arguments passed to all module functions alongside config. */
-    args?: Record<string, unknown>;
+    args?: TArgs;
     /** Warning handler. Default: console.warn. */
     onWarning?: (message: string) => void;
 }

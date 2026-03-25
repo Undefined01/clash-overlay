@@ -13,7 +13,7 @@ import type { Segment } from './core-merge.js';
 const OPTION_TYPE_SYMBOL = Symbol.for('libmodule:option-type');
 
 /** Check if a value is an OptionType. */
-export function isOptionType(val: unknown): val is OptionType {
+export function isOptionType(val: unknown): val is OptionType<unknown, unknown> {
     return val !== null && typeof val === 'object' && OPTION_TYPE_SYMBOL in (val as object);
 }
 
@@ -22,26 +22,29 @@ export function isOptionType(val: unknown): val is OptionType {
 /**
  * Defines per-key merge semantics, validation, and optional transforms.
  */
-export interface OptionType<T = unknown> {
+export interface OptionType<TValue = unknown, TOutput = TValue> {
     readonly [OPTION_TYPE_SYMBOL]: true;
     readonly name: string;
     /** Validate a single value. */
     check: (value: unknown) => boolean;
     /** Merge multiple definitions (after priority filtering). */
-    merge: (key: string, defs: T[]) => T;
+    merge: (key: string, defs: TValue[]) => TValue;
     /** Default empty value when no definitions provided. */
-    emptyValue?: () => T;
+    emptyValue?: () => TValue;
+    /** Optional final transform applied after validation. */
+    apply?: (value: TValue) => TOutput;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
-export function makeType<T>(
+export function makeType<TValue, TOutput = TValue>(
     name: string,
     check: (value: unknown) => boolean,
-    merge: (key: string, defs: T[]) => T,
-    emptyValue?: () => T,
-): OptionType<T> {
-    return { [OPTION_TYPE_SYMBOL]: true as const, name, check, merge, emptyValue };
+    merge: (key: string, defs: TValue[]) => TValue,
+    emptyValue?: () => TValue,
+    apply?: (value: TValue) => TOutput,
+): OptionType<TValue, TOutput> {
+    return { [OPTION_TYPE_SYMBOL]: true as const, name, check, merge, emptyValue, apply };
 }
 
 /** All-must-equal merge: all defs must be the same value. */
@@ -217,28 +220,24 @@ const anything: OptionType = makeType(
 /**
  * Lines type. Sugar for listOf(str) with apply that joins with '\n'.
  */
-const lines: OptionType<string> & { apply: (val: unknown) => string } = {
-    ...makeType(
-        'lines',
-        (v) => typeof v === 'string' || (Array.isArray(v) && v.every(item => typeof item === 'string')),
-        (_key, defs) => {
-            const all: string[] = [];
-            for (const def of defs) {
-                if (Array.isArray(def)) {
-                    all.push(...(def as string[]));
-                } else {
-                    all.push(def as string);
-                }
+const lines: OptionType<string | string[]> = makeType<string | string[]>(
+    'lines',
+    (v): v is string | string[] =>
+        typeof v === 'string' || (Array.isArray(v) && v.every(item => typeof item === 'string')),
+    (_key, defs) => {
+        const all: string[] = [];
+        for (const def of defs) {
+            if (Array.isArray(def)) {
+                all.push(...def);
+            } else {
+                all.push(def);
             }
-            return all as unknown as string;
-        },
-        () => '' as string,
-    ),
-    apply: (val: unknown): string => {
-        if (Array.isArray(val)) return val.join('\n');
-        return String(val);
+        }
+        return all;
     },
-};
+    () => '',
+    (val): string => Array.isArray(val) ? val.join('\n') : val,
+);
 
 /** Coerced type. Coerces values before delegating to inner type. */
 function coercedTo<S, T>(

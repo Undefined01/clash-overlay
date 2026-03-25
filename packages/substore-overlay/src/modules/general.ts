@@ -1,13 +1,12 @@
 // substore-overlay/src/modules/general.ts — 通用配置
 
-import type { ModuleArgs } from 'libmodule';
 import { getGithub } from '../lib/clash.js';
-import type { ModuleContext } from './lib.js';
+import type { OverlayModuleArgs } from './lib.js';
 
 export default function generalModule(
-    args: ModuleArgs,
+    args: OverlayModuleArgs,
 ): Record<string, unknown> {
-    const ctx = args.ctx as ModuleContext;
+    const { ctx } = args;
     const ipv6Enabled = ctx.arguments.ipv6Enabled ?? false;
 
     return {

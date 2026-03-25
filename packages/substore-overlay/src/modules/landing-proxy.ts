@@ -1,14 +1,13 @@
-import type { ModuleArgs } from 'libmodule';
 import { mkOrder } from 'libmodule';
 import { GROUP_COMMON, PRIMITIVE_GROUPS, externalIcon, reorderProxies } from '../lib/clash.js';
-import type { ModuleContext } from './lib.js';
+import type { OverlayModuleArgs } from './lib.js';
 import { NodeInfo } from '../lib/proxy-processor/types.js';
 import { proxyGroupOrder, proxyInsertionOrder } from './order.js';
 
 export default function landingProxyModule(
-    args: ModuleArgs,
+    args: OverlayModuleArgs,
 ): Record<string, unknown> {
-    const ctx = args.ctx as ModuleContext;
+    const { ctx } = args;
     const forwardProxies = ctx.originalConfig.proxies?.filter(p => {
         let tags = (p._nodeInfo as NodeInfo)?.tags || [];
         return !tags.includes('落地');

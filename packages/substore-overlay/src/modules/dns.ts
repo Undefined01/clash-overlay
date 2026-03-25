@@ -1,13 +1,12 @@
 // substore-overlay/src/modules/dns.ts — DNS 配置
 
-import type { ModuleArgs } from 'libmodule';
 import { dustinRule } from '../lib/clash.js';
-import type { ModuleContext } from './lib.js';
+import type { OverlayModuleArgs } from './lib.js';
 
 export default function dnsModule(
-    args: ModuleArgs,
+    args: OverlayModuleArgs,
 ): Record<string, unknown> {
-    const ctx = args.ctx as ModuleContext;
+    const { ctx } = args;
     const ipv6Enabled = ctx.arguments.ipv6Enabled ?? false;
     const dnsMode = ctx.arguments.dnsMode;
 

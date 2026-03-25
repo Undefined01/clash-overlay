@@ -13,6 +13,7 @@
 
 import { deepCleanUndefined, normalizeFinal, resolveDeferred, resolveDeferredAsync } from './resolve.js';
 import type { OverlayFn, AsyncOverlayFn, ApplyOverlaysOptions } from './types.js';
+import { createLazyRecordProxy } from './lazy-record-proxy.js';
 
 /**
  * Apply overlays to a base state, producing the final merged result.
@@ -31,50 +32,21 @@ import type { OverlayFn, AsyncOverlayFn, ApplyOverlaysOptions } from './types.js
  * @param options  - Custom merge strategy
  * @returns Final resolved result
  */
-export function applyOverlays(
-    base: Record<string, unknown>,
-    overlays: OverlayFn[],
-    options: ApplyOverlaysOptions = {},
-): Record<string, unknown> {
+export function applyOverlays<TState extends Record<string, unknown> = Record<string, unknown>>(
+    base: Partial<TState>,
+    overlays: Array<OverlayFn<TState>>,
+    options: ApplyOverlaysOptions<TState> = {},
+): TState {
     const merge = options.merge ?? shallowMerge;
 
     let finalResolved: Record<string, unknown> | null = null;
-
-    // Proxy for `final`: defers all access until after merge completes
-    const finalProxy = new Proxy(Object.create(null) as Record<string, unknown>, {
-        get(_: Record<string, unknown>, prop: string | symbol): unknown {
-            if (prop === '__isFinalProxy') return true;
-            if (finalResolved === null) {
-                throw new Error(
-                    `Cannot eagerly access final.${String(prop)} during overlay evaluation. ` +
-                    `Wrap in defer(() => final.${String(prop)}).`,
-                );
-            }
-            return finalResolved[prop as string];
-        },
-        has(_: Record<string, unknown>, prop: string | symbol): boolean {
-            if (finalResolved === null) {
-                throw new Error(`Cannot check 'final' membership during overlay evaluation.`);
-            }
-            return (prop as string) in finalResolved;
-        },
-        ownKeys(): Array<string | symbol> {
-            if (finalResolved === null) {
-                throw new Error(`Cannot enumerate 'final' during overlay evaluation.`);
-            }
-            return Reflect.ownKeys(finalResolved);
-        },
-        getOwnPropertyDescriptor(_: Record<string, unknown>, prop: string | symbol): PropertyDescriptor | undefined {
-            if (finalResolved === null) return undefined;
-            if ((prop as string) in finalResolved) {
-                return { value: finalResolved[prop as string], writable: true, enumerable: true, configurable: true };
-            }
-            return undefined;
-        },
-    });
+    const finalProxy = createLazyRecordProxy(
+        () => finalResolved,
+        { name: 'final', phase: 'overlay evaluation' },
+    ) as TState;
 
     // Phase 1: Sequential overlay application
-    let current: Record<string, unknown> = { ...base };
+    let current: Partial<TState> = { ...base };
     for (const overlay of overlays) {
         const ext = overlay(finalProxy, current);
         current = merge(current, ext);
@@ -87,7 +59,7 @@ export function applyOverlays(
 
     // Phase 3: Clean undefined values
     const cleaned = deepCleanUndefined(resolved);
-    return (cleaned ?? {}) as Record<string, unknown>;
+    return (cleaned ?? {}) as TState;
 }
 
 /**
@@ -95,47 +67,20 @@ export function applyOverlays(
  * - overlay functions that return Promise
  * - deferred resolvers that return Promise
  */
-export async function applyOverlaysAsync(
-    base: Record<string, unknown>,
-    overlays: AsyncOverlayFn[],
-    options: ApplyOverlaysOptions = {},
-): Promise<Record<string, unknown>> {
+export async function applyOverlaysAsync<TState extends Record<string, unknown> = Record<string, unknown>>(
+    base: Partial<TState>,
+    overlays: Array<AsyncOverlayFn<TState>>,
+    options: ApplyOverlaysOptions<TState> = {},
+): Promise<TState> {
     const merge = options.merge ?? shallowMerge;
 
     let finalResolved: Record<string, unknown> | null = null;
-    const finalProxy = new Proxy(Object.create(null) as Record<string, unknown>, {
-        get(_: Record<string, unknown>, prop: string | symbol): unknown {
-            if (prop === '__isFinalProxy') return true;
-            if (finalResolved === null) {
-                throw new Error(
-                    `Cannot eagerly access final.${String(prop)} during overlay evaluation. ` +
-                    `Wrap in defer(() => final.${String(prop)}).`,
-                );
-            }
-            return finalResolved[prop as string];
-        },
-        has(_: Record<string, unknown>, prop: string | symbol): boolean {
-            if (finalResolved === null) {
-                throw new Error(`Cannot check 'final' membership during overlay evaluation.`);
-            }
-            return (prop as string) in finalResolved;
-        },
-        ownKeys(): Array<string | symbol> {
-            if (finalResolved === null) {
-                throw new Error(`Cannot enumerate 'final' during overlay evaluation.`);
-            }
-            return Reflect.ownKeys(finalResolved);
-        },
-        getOwnPropertyDescriptor(_: Record<string, unknown>, prop: string | symbol): PropertyDescriptor | undefined {
-            if (finalResolved === null) return undefined;
-            if ((prop as string) in finalResolved) {
-                return { value: finalResolved[prop as string], writable: true, enumerable: true, configurable: true };
-            }
-            return undefined;
-        },
-    });
+    const finalProxy = createLazyRecordProxy(
+        () => finalResolved,
+        { name: 'final', phase: 'overlay evaluation' },
+    ) as TState;
 
-    let current: Record<string, unknown> = { ...base };
+    let current: Partial<TState> = { ...base };
     for (const overlay of overlays) {
         const ext = await overlay(finalProxy, current);
         current = merge(current, ext);
@@ -146,13 +91,13 @@ export async function applyOverlaysAsync(
     finalResolved = resolved;
 
     const cleaned = deepCleanUndefined(resolved);
-    return (cleaned ?? {}) as Record<string, unknown>;
+    return (cleaned ?? {}) as TState;
 }
 
-function shallowMerge(
-    current: Record<string, unknown>,
-    extension: Record<string, unknown>,
-): Record<string, unknown> {
+function shallowMerge<TState extends Record<string, unknown>>(
+    current: Partial<TState>,
+    extension: Partial<TState>,
+): Partial<TState> {
     return { ...current, ...extension };
 }
 

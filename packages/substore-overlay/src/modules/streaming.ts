@@ -6,6 +6,7 @@ import { proxyGroupOrder, ruleOrder } from './order.js';
 export default function streamingModule(
     { config }: ModuleArgs,
 ): Record<string, unknown> {
+    // netflixip and mediaip are intentionally kept in lower case, following the naming in the dustin upstream.
     const rulesets = [
         'netflix', 'netflixip', 'disney', 'max', 'primevideo', 'appletv',
         'youtube', 'tiktok', 'spotify', 'media', 'mediaip',

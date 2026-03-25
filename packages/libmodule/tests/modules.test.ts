@@ -71,6 +71,19 @@ describe('evalModules', () => {
         expect(result.x).toBe(42);
     });
 
+    it('applies transforms declared on option types during finalization', () => {
+        const a: ModuleFn = () => ({
+            _options: {
+                greeting: { type: types.lines },
+            },
+        });
+        const b: ModuleFn = () => ({ greeting: ['hello', 'world'] });
+
+        expect(evalModules({}, [a, b])).toEqual({
+            greeting: 'hello\nworld',
+        });
+    });
+
     it('normalizes config access inside deferred (arrays are plain arrays)', () => {
         const a: ModuleFn = () => ({ items: ['a'] });
         const b: ModuleFn = () => ({ items: ['b'] });
@@ -221,6 +234,11 @@ describe('evalModules', () => {
 
     it('throws when a module does not return a record', () => {
         const bad: ModuleFn = () => null as unknown as Record<string, unknown>;
+        expect(() => evalModules({}, [bad])).toThrow(/must return a plain object record/);
+    });
+
+    it('throws when a module returns a non-plain object instance', () => {
+        const bad: ModuleFn = () => new Date() as unknown as Record<string, unknown>;
         expect(() => evalModules({}, [bad])).toThrow(/must return a plain object record/);
     });
 

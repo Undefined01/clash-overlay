@@ -8,11 +8,11 @@ import { isPlainObject } from './core-merge.js';
 
 // ─── Option Declaration ─────────────────────────────────────────────
 
-export interface OptionDeclaration<T = unknown> {
-    type: OptionType<T>;
-    default?: T;
+export interface OptionDeclaration<TValue = unknown, TOutput = TValue> {
+    type: OptionType<TValue, TOutput>;
+    default?: TValue;
     description?: string;
-    apply?: (value: T) => unknown;
+    apply?: (value: TValue) => TOutput;
 }
 
 // ─── Options Extraction ─────────────────────────────────────────────
@@ -39,21 +39,21 @@ export function extractOptions(
         if (!('_options' in frag) || frag._options === undefined) continue;
 
         const raw = frag._options;
-        if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+        if (!isPlainObject(raw)) {
             throw new Error('_options must be a plain object.');
         }
 
         const incoming = new Map<string, OptionDeclaration>();
-        flattenOptions(raw as Record<string, unknown>, '', incoming);
+        flattenOptions(raw, '', incoming);
 
         // Merge incoming declarations into result
         for (const [key, decl] of incoming) {
             const existing = result.get(key);
             if (existing) {
-                if (existing.type.name !== decl.type.name) {
+                if (existing.type !== decl.type) {
                     throw new Error(
                         `Conflicting _options type for "${key}": ` +
-                        `"${existing.type.name}" vs "${decl.type.name}".`,
+                        `reuse the same OptionType instance instead of redeclaring "${existing.type.name}".`,
                     );
                 }
                 // Same type name — last-writer-wins for default/description/apply

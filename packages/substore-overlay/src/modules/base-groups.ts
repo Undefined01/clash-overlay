@@ -1,17 +1,16 @@
-import type { ModuleArgs } from 'libmodule';
 import { mkBefore, mkMerge, mkOrder } from 'libmodule';
 import {
     miniIcon, qureIcon,
     generalGroup, PRIMITIVE_GROUPS,
 } from '../lib/clash.js';
-import type { ModuleContext } from './lib.js';
+import type { OverlayModuleArgs } from './lib.js';
 import { proxyInsertionOrder } from './order.js';
 
 export default function baseGroupsModule(
-    args: ModuleArgs,
+    args: OverlayModuleArgs,
 ): Record<string, unknown> {
     const config = args.config;
-    const ctx = args.ctx as ModuleContext;
+    const { ctx } = args;
     const proxies = (ctx.originalConfig.proxies || [])
         .map(p => String(p.name || ''))
         .filter(Boolean);

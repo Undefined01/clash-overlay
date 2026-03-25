@@ -19,6 +19,7 @@ import streamingModule from '../modules/streaming.js';
 import gamingModule from '../modules/gaming.js';
 import aiModule from '../modules/ai.js';
 import proxyModule from '../modules/proxy.js';
+import type { ModuleContext } from '../modules/lib.js';
 
 const ModuleContextSchema = v.object({
     arguments: v.object({
@@ -30,7 +31,7 @@ const ModuleContextSchema = v.object({
 });
 
 // ── 模块注册（合并顺序 = 注册顺序，列表排序由 src/modules/order.ts 集中控制）──
-const modules: ModuleFn[] = [
+const modules: Array<ModuleFn<{ ctx: ModuleContext }>> = [
     clashSchema,         // 配置选项声明（proxy-groups, proxies, rules, rule-providers）
     generalModule,       // 通用配置（标量/对象，无列表）
     dnsModule,           // DNS 配置（标量/对象，无分流规则）

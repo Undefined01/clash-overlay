@@ -14,7 +14,7 @@ API 参考文档可通过 `pnpm docs` 自动生成至 `docs/api/`。
 - [Overlay 系统](#overlay-系统)
   - [基本用法](#基本用法)
   - [prev 与 final](#prev-与-final)
-  - [延迟求值 deferred](#延迟求值-deferred)
+  - [延迟求值 defer](#延迟求值-defer)
 - [优先级系统](#优先级系统)
   - [为什么需要优先级](#为什么需要优先级)
   - [mkDefault / mkForce / mkOverride](#mkdefault--mkforce--mkoverride)
@@ -23,10 +23,9 @@ API 参考文档可通过 `pnpm docs` 自动生成至 `docs/api/`。
 - [排序系统](#排序系统)
   - [mkBefore / mkAfter / mkOrder](#mkbefore--mkafter--mkorder)
   - [排序数值表](#排序数值表)
-- [模块合并引擎 moduleMerge](#模块合并引擎-modulemerge)
+- [深合并 deepMerge](#深合并-deepmerge)
   - [合并策略](#合并策略)
-  - [createModuleMerge 自定义选项](#createmodulemarge-自定义选项)
-  - [cleanup](#cleanup)
+  - [自定义 merge 函数](#自定义-merge-函数)
 - [模块系统 evalModules](#模块系统-evalmodules)
 - [其他工具函数](#其他工具函数)
 - [完整 API 一览](#完整-api-一览)
@@ -79,7 +78,7 @@ pnpm add libmodule
 ## 快速上手
 
 ```ts
-import { applyOverlays, moduleMerge, mkBefore, mkAfter } from 'libmodule';
+import { applyOverlays, deepMerge, mkBefore, mkAfter } from 'libmodule';
 
 // 定义三个 overlay（配置片段）
 const base = () => ({
@@ -97,7 +96,7 @@ const fallback = () => ({
 
 // 合并
 const config = applyOverlays({}, [base, security, fallback], {
-  merge: moduleMerge,
+  merge: deepMerge,
 });
 
 console.log(config);
@@ -117,7 +116,7 @@ console.log(config);
 
 - `base`：初始状态（通常是 `{}`）
 - `overlays`：一个 overlay 函数数组，每个函数返回一个配置片段
-- `options.merge`：合并策略（推荐使用 `moduleMerge`）
+- `options.merge`：合并策略（常用的是 `deepMerge`）
 
 ```ts
 import { applyOverlays } from 'libmodule';
@@ -136,7 +135,7 @@ const result = applyOverlays(
 
 | 参数 | 含义 | 何时可用 |
 |------|------|---------|
-| `final` | 所有 overlay 合并后的**最终**状态 | 只能在 `deferred()` 中访问 |
+| `final` | 所有 overlay 合并后的**最终**状态 | 只能在 `defer()` 中访问 |
 | `prev` | 当前 overlay 之前的**累积**状态 | 随时可以直接读取 |
 
 ### prev 与 final
@@ -158,14 +157,14 @@ const bad = (final, prev) => ({
 });
 ```
 
-那 `final` 有什么用？答案是 `deferred()`。
+那 `final` 有什么用？答案是 `defer()`。
 
-### 延迟求值 deferred
+### 延迟求值 defer
 
-`deferred(fn)` 创建一个"延迟值"——它的求值被推迟到所有 overlay 合并完毕之后：
+`defer(fn)` 创建一个"延迟值"——它的求值被推迟到所有 overlay 合并完毕之后：
 
 ```ts
-import { deferred, applyOverlays, moduleMerge } from 'libmodule';
+import { defer, applyOverlays, deepMerge } from 'libmodule';
 
 const result = applyOverlays(
   {},
@@ -173,10 +172,10 @@ const result = applyOverlays(
     () => ({ items: ['a', 'b', 'c'] }),
     (final) => ({
       // 延迟到合并完毕后再求值
-      summary: deferred(() => `共 ${final.items.length} 项`),
+      summary: defer(() => `共 ${final.items.length} 项`),
     }),
   ],
-  { merge: moduleMerge },
+  { merge: deepMerge },
 );
 
 console.log(result.summary); // '共 3 项'
@@ -192,7 +191,7 @@ const modA = () => ({ _proxies: ['HK', 'US'] });
 const modB = (final) => ({
   groups: [{
     name: 'Select',
-    proxies: deferred(() => final._proxies),
+    proxies: defer(() => final._proxies),
   }],
 });
 ```
@@ -246,32 +245,32 @@ const mod4 = () => ({ port: mkOverride(25, 9999) });
 | 不同优先级 | 数字更小的一方胜出 |
 
 ```ts
-import { applyOverlays, moduleMerge, mkDefault, mkForce } from 'libmodule';
+import { applyOverlays, deepMerge, mkDefault, mkForce } from 'libmodule';
 
 // ✅ 同一个值，没有冲突
 applyOverlays({}, [
   () => ({ port: 8080 }),
   () => ({ port: 8080 }),
-], { merge: moduleMerge });
+], { merge: deepMerge });
 
 // ❌ 不同值 + 相同优先级 → 报错
 applyOverlays({}, [
   () => ({ port: 8080 }),
   () => ({ port: 3000 }),   // 💥 Scalar conflict for key "port"
-], { merge: moduleMerge });
+], { merge: deepMerge });
 
 // ✅ mkDefault 被裸值覆盖（1000 > 100）
 applyOverlays({}, [
   () => ({ port: mkDefault(8080) }),
   () => ({ port: 3000 }),
-], { merge: moduleMerge });
+], { merge: deepMerge });
 // → { port: 3000 }
 
 // ✅ mkForce 覆盖裸值（50 < 100）
 applyOverlays({}, [
   () => ({ port: 3000 }),
   () => ({ port: mkForce(443) }),
-], { merge: moduleMerge });
+], { merge: deepMerge });
 // → { port: 443 }
 ```
 
@@ -325,73 +324,55 @@ MATCH,PROXY       (1500 — mkAfter)
 
 ---
 
-## 模块合并引擎 moduleMerge
+## 深合并 deepMerge
 
-`moduleMerge` 是一个综合了以上所有能力的合并策略，适用于 `applyOverlays` 的 `merge` 选项。
+`deepMerge` 是当前公开的内置 merge 策略，适用于 `applyOverlays` 的 `merge` 选项。
 
 ### 合并策略
 
-`moduleMerge` 对不同类型的值采取不同的合并策略：
+`deepMerge` 对不同类型的值采取不同的合并策略：
 
 | 值类型 | 策略 | 例子 |
 |--------|------|------|
 | **数组** | 收集为有序段落，按排序值拼接 | `rules: ['a']` + `rules: ['b']` → `['a', 'b']` |
-| **对象** | 递归深合并；内部的数组拼接 | `{a: {x:1}}` + `{a: {y:2}}` → `{a: {x:1, y:2}}` |
-| **标量** | 优先级冲突检测 | 同值 OK，不同值需要不同优先级 |
-| **`_` 前缀键** | 后者覆盖（元数据，不参与上述规则） | `_proxies: ['a']` + `_proxies: ['b']` → `['b']` |
-| **`deferred`** | 延迟求值（后者替换前者） | 合并完毕后解析 |
+| **对象** | 递归深合并；内部的数组继续按相同规则合并 | `{a: {x:1}}` + `{a: {y:2}}` → `{a: {x:1, y:2}}` |
+| **标量** | 后者覆盖前者 | `{ port: 7890 }` + `{ port: 1080 }` → `{ port: 1080 }` |
+| **`defer`** | 包装递归合并，直到最终求值时解析 | 合并完毕后解析 |
 
-### createModuleMerge 自定义选项
+### 自定义 merge 函数
 
-如果默认行为不完全满足需求，可以用 `createModuleMerge(options)` 创建自定义的合并函数：
-
-```ts
-import { createModuleMerge, applyOverlays } from 'libmodule';
-
-const myMerge = createModuleMerge({
-  // 这些 key 下的子 key 不允许重复（重复即报错）
-  uniqueKeyFields: ['rule-providers', 'users'],
-
-  // 元数据前缀（默认 '_'）——匹配的键用后者覆盖语义
-  metadataPrefix: '_',
-});
-
-const result = applyOverlays({}, overlays, { merge: myMerge });
-```
-
-#### ModuleMergeOptions
-
-| 选项 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `uniqueKeyFields` | `string[]` | `[]` | 对象类型的 key，其子 key 不允许重复 |
-| `metadataPrefix` | `string` | `'_'` | 元数据 key 的前缀标识 |
-
-### cleanup
-
-合并后通常需要清理元数据和空值：
+如果默认行为不完全满足需求，可以直接传入自定义 `merge` 函数：
 
 ```ts
-import { cleanup } from 'libmodule';
+import { applyOverlays, scalarEqual, coreMerge } from 'libmodule';
 
-const merged = applyOverlays(base, overlays, { merge: moduleMerge });
-const final = cleanup(merged);
-// 移除所有 _* 键、undefined 值、空对象
+const strictMerge = (current, extension) => {
+  const result = { ...current };
+  for (const [key, value] of Object.entries(extension)) {
+    result[key] = key in result
+      ? coreMerge(key, result[key], value, scalarEqual)
+      : value;
+  }
+  return result;
+};
+
+const result = applyOverlays({}, overlays, { merge: strictMerge });
 ```
 
-`cleanup(config, prefix)` 的第二个参数可以指定前缀（默认 `'_'`）。
+`applyOverlays` 自身会在最终阶段清理 `undefined` 值；`evalModules` 还会额外移除系统保留键（如 `_imports`、`_options`）。
 
 ---
 
 ## 模块系统 evalModules
 
-`evalModules` 提供更接近 NixOS module 的使用方式：每个 module 的定义为 `(config) => Record<string, unknown>`，返回的配置片段会用 `moduleMerge` 合并，并在最后统一求值（`resolveDeferred`）。
+`evalModules` 提供更接近 NixOS module 的使用方式：每个 module 的定义为 `({ config, ...args }) => Record<string, unknown>`，返回的配置片段会按 key 收集 definitions，经优先级过滤、类型合并和 `defer` 解析后得到最终结果。
 
 模块可以返回一个特殊字段 `_imports`（module 列表），用于引入其它模块一并求值；该字段不会出现在最终结果中。
 
-注意：与 `applyOverlays` 的 `final` 一样，module 执行阶段不能直接读取 `config`，需要用 `deferred(() => config.xxx)` 延迟到合并完成后访问。
+注意：与 `applyOverlays` 的 `final` 一样，module 执行阶段不能直接读取 `config`，需要用 `defer(() => config.xxx)` 延迟到合并完成后访问。
 
 ```ts
-import { evalModules, deferred } from 'libmodule';
+import { evalModules, defer } from 'libmodule';
 
 const base = () => ({
   port: 7890,
@@ -402,16 +383,16 @@ const extra = () => ({
   rules: ['b'],
 });
 
-const root = (config) => ({
+const root = ({ config }) => ({
   _imports: [extra],
-  summary: deferred(() => `rules: ${(config.rules as string[]).join(',')}`),
+  summary: defer(() => `rules: ${(config.rules as string[]).join(',')}`),
 });
 
 const final = evalModules({}, [base, root]);
 console.log(final.summary); // 'rules: a,b'
 ```
 
-需要 async 时使用 `evalModulesAsync`：module 可以是 `async` 函数，且 `deferred` resolver 可以返回 `Promise`。
+需要 async 时使用 `evalModulesAsync`：module 可以是 `async` 函数，且 `defer` resolver 可以返回 `Promise`。
 
 ---
 
@@ -435,14 +416,15 @@ console.log(extended.port); // 8081
 
 | 函数 | 作用 |
 |------|------|
-| `isDeferred(val)` | 判断是否为延迟值 |
+| `isDefer(val)` | 判断是否为延迟值 |
 | `isOverride(val)` | 判断是否为优先级包装值 |
 | `isOrdered(val)` | 判断是否为排序包装值 |
 | `isOrderedList(val)` | 判断是否为有序列表（合并中间态） |
 | `isArrayLike(val)` | 判断是否为数组或排序包装值 |
 | `getPriority(val)` | 获取值的优先级数值（裸值返回 100） |
 | `unwrapPriority(val)` | 剥离优先级包装，返回原始值 |
-| `resolveDeferred(obj)` | 递归解析对象中的所有 deferred 值 |
+| `forceDefer(val)` | 显式触发单个 defer 值 |
+| `resolveDeferred(obj)` | 递归解析对象中的所有 defer 值 |
 
 ---
 
@@ -453,18 +435,17 @@ console.log(extended.port); // 8081
 ### 类型
 
 ```ts
-type MergeFn = (current: Record<string, unknown>, extension: Record<string, unknown>) => Record<string, unknown>
-type OverlayFn = (final: Record<string, unknown>, prev: Record<string, unknown>) => Record<string, unknown>
-type ModuleFn = (config: Record<string, unknown>) => Record<string, unknown>
-type AsyncModuleFn = (config: Record<string, unknown>) => Record<string, unknown> | Promise<Record<string, unknown>>
+type MergeFn<TState = Record<string, unknown>> = (current: Partial<TState>, extension: Partial<TState>) => Partial<TState>
+type OverlayFn<TState = Record<string, unknown>> = (final: TState, prev: Partial<TState>) => Partial<TState>
+type ModuleArgs<TArgs, TConfig>
+type ModuleFn<TArgs, TConfig> = (args: ModuleArgs<TArgs, TConfig>) => Record<string, unknown>
+type AsyncModuleFn<TArgs, TConfig> = (args: ModuleArgs<TArgs, TConfig>) => Record<string, unknown> | Promise<Record<string, unknown>>
 
-interface Deferred<T>       // 延迟值
 interface Override<T>       // 优先级包装
 interface Ordered<T>        // 排序包装
 interface OrderedList<T>    // 有序列表（合并中间态）
 interface ApplyOverlaysOptions  // applyOverlays 选项
 interface EvalModulesOptions    // evalModules 选项
-interface ModuleMergeOptions    // createModuleMerge 选项
 ```
 
 ### 常量
@@ -491,8 +472,9 @@ extends_(overlay, baseFunc)
 composeManyExtensions(overlays)
 
 // 延迟求值
-deferred(fn)
-isDeferred(val)
+defer(fn)
+isDefer(val)
+forceDefer(val)
 resolveDeferred(obj)
 resolveDeferredAsync(obj)
 
@@ -512,8 +494,12 @@ isOrdered(val)
 isOrderedList(val)
 isArrayLike(val)
 
-// 模块合并
-moduleMerge          // 默认合并策略实例
-createModuleMerge(options?)
-cleanup(config, prefix?)
+// merge helpers
+deepMerge(current, extension)
+coreMerge(key, current, extension, onScalar?)
+coreDeepMerge(key, current, extension, onScalar?)
+
+// 条件与多定义
+mkIf(condition, value)
+mkMerge(definitions)
 ```

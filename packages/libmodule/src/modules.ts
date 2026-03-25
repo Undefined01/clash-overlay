@@ -10,159 +10,56 @@
 import { deepCleanUndefined, normalizeFinal, resolveDeferred, resolveDeferredAsync } from './resolve.js';
 import { extractOptions, resolveOptionType, getOptionDefault } from './options.js';
 import { collectDefinitions, mergeKey } from './merge-engine.js';
-import { isPromiseLike } from './core-merge.js';
+import { isPlainObject, isPromiseLike } from './core-merge.js';
 import { types } from './option-types.js';
 import type { OptionType } from './option-types.js';
 import type { OptionDeclaration } from './options.js';
 import type { AsyncModuleFn, EvalModulesOptions, ModuleArgs, ModuleFn } from './types.js';
+import { createLazyRecordProxy } from './lazy-record-proxy.js';
 
 const IMPORTS_KEY = '_imports';
 const SYSTEM_KEYS = new Set(['_assertions', '_warnings', '_options', '_imports', '_module']);
 
-export function evalModules(
+export function evalModules<TArgs extends Record<string, unknown> & { config?: never } = {}>(
     base: Record<string, unknown>,
-    modules: ModuleFn[],
-    options: EvalModulesOptions = {},
+    modules: Array<ModuleFn<TArgs, Record<string, unknown>>>,
+    options: EvalModulesOptions<TArgs> = {},
 ): Record<string, unknown> {
     let finalResolved: Record<string, unknown> | null = null;
     const configProxy = createConfigProxy(() => finalResolved);
-
-    const userArgs = options.args ?? {};
-    if ('config' in userArgs) {
-        throw new Error('Cannot override "config" in module args.');
-    }
-    const moduleArgs: ModuleArgs = { ...userArgs, config: configProxy };
+    const moduleArgs = createModuleArgs(configProxy, options);
 
     // ── Phase 1: Collect ──
     const fragments = collectModules(modules, moduleArgs);
-    const allFragments = [stripImports({ ...base }), ...fragments];
-
-    // Extract _options declarations (merged across modules)
-    const optionDecls = extractOptions(allFragments);
-
-    // Read _module settings
-    const moduleSettings = readModuleSettings(allFragments);
-
-    // ── Phase 2: Per-key merge ──
-    const definitions = collectDefinitions(allFragments);
-
-    // Add implicit _assertions and _warnings declarations
-    ensureImplicitOptions(optionDecls);
-
-    const merged: Record<string, unknown> = {};
-    for (const [key, defs] of definitions) {
-        const optionType = resolveOptionType(
-            key,
-            optionDecls,
-            moduleSettings.check,
-            moduleSettings.freeformType,
-        );
-        merged[key] = mergeKey(key, defs, optionType);
-    }
-
-    // Add defaults for declared options with no definitions at all
-    // (only for user-declared options, not implicit _assertions/_warnings)
-    for (const [key] of optionDecls) {
-        if (key === '_assertions' || key === '_warnings') continue;
-        if (!(key in merged)) {
-            const { hasDefault, value } = getOptionDefault(key, optionDecls);
-            if (hasDefault) merged[key] = value;
-        }
-    }
+    const { merged, optionDecls } = buildMergedConfig(base, fragments);
 
     // ── Phase 3: Resolve deferred ──
     finalResolved = normalizeFinal(merged) as Record<string, unknown>;
     const resolved = resolveDeferred(merged) as Record<string, unknown>;
     finalResolved = resolved;
 
-    // ── Phase 4: Finalize ──
-    // 4a. Type validation
-    validateOptions(resolved, optionDecls);
-
-    // 4b. Apply option transforms
-    for (const [key, decl] of optionDecls) {
-        if (decl.apply && key in resolved) {
-            resolved[key] = decl.apply(resolved[key]);
-        }
-    }
-
-    // 4c. Evaluate assertions
-    evaluateAssertions(resolved);
-
-    // 4d. Process warnings
-    processWarnings(resolved, options.onWarning);
-
-    // 4e. Strip system keys
-    const stripped = stripSystemKeys(resolved);
-
-    // 4f. Clean undefined
-    const cleaned = deepCleanUndefined(stripped);
-    return (cleaned ?? {}) as Record<string, unknown>;
+    return finalizeModules(resolved, optionDecls, options.onWarning);
 }
 
-export async function evalModulesAsync(
+export async function evalModulesAsync<TArgs extends Record<string, unknown> & { config?: never } = {}>(
     base: Record<string, unknown>,
-    modules: AsyncModuleFn[],
-    options: EvalModulesOptions = {},
+    modules: Array<AsyncModuleFn<TArgs, Record<string, unknown>>>,
+    options: EvalModulesOptions<TArgs> = {},
 ): Promise<Record<string, unknown>> {
     let finalResolved: Record<string, unknown> | null = null;
     const configProxy = createConfigProxy(() => finalResolved);
-
-    const userArgs = options.args ?? {};
-    if ('config' in userArgs) {
-        throw new Error('Cannot override "config" in module args.');
-    }
-    const moduleArgs: ModuleArgs = { ...userArgs, config: configProxy };
+    const moduleArgs = createModuleArgs(configProxy, options);
 
     // ── Phase 1: Collect ──
     const fragments = await collectModulesAsync(modules, moduleArgs);
-    const allFragments = [stripImports({ ...base }), ...fragments];
-
-    const optionDecls = extractOptions(allFragments);
-    const moduleSettings = readModuleSettings(allFragments);
-
-    // ── Phase 2: Per-key merge ──
-    const definitions = collectDefinitions(allFragments);
-    ensureImplicitOptions(optionDecls);
-
-    const merged: Record<string, unknown> = {};
-    for (const [key, defs] of definitions) {
-        const optionType = resolveOptionType(
-            key,
-            optionDecls,
-            moduleSettings.check,
-            moduleSettings.freeformType,
-        );
-        merged[key] = mergeKey(key, defs, optionType);
-    }
-
-    for (const [key] of optionDecls) {
-        if (key === '_assertions' || key === '_warnings') continue;
-        if (!(key in merged)) {
-            const { hasDefault, value } = getOptionDefault(key, optionDecls);
-            if (hasDefault) merged[key] = value;
-        }
-    }
+    const { merged, optionDecls } = buildMergedConfig(base, fragments);
 
     // ── Phase 3: Resolve deferred ──
     finalResolved = normalizeFinal(merged) as Record<string, unknown>;
     const resolved = await resolveDeferredAsync(merged) as Record<string, unknown>;
     finalResolved = resolved;
 
-    // ── Phase 4: Finalize ──
-    validateOptions(resolved, optionDecls);
-
-    for (const [key, decl] of optionDecls) {
-        if (decl.apply && key in resolved) {
-            resolved[key] = decl.apply(resolved[key]);
-        }
-    }
-    evaluateAssertions(resolved);
-    processWarnings(resolved, options.onWarning);
-
-    const stripped = stripSystemKeys(resolved);
-    const cleaned = deepCleanUndefined(stripped);
-    return (cleaned ?? {}) as Record<string, unknown>;
+    return finalizeModules(resolved, optionDecls, options.onWarning);
 }
 
 // ─── _module settings ───────────────────────────────────────────────
@@ -177,8 +74,8 @@ function readModuleSettings(fragments: Array<Record<string, unknown>>): ModuleSe
     let freeformType: OptionType | undefined;
 
     for (const frag of fragments) {
-        if ('_module' in frag && typeof frag._module === 'object' && frag._module !== null) {
-            const mod = frag._module as Record<string, unknown>;
+        if ('_module' in frag && isPlainObject(frag._module)) {
+            const mod = frag._module;
             if ('check' in mod && typeof mod.check === 'boolean') {
                 check = mod.check;
             }
@@ -220,6 +117,19 @@ function validateOptions(
     }
 }
 
+function applyOptionTransforms(
+    resolved: Record<string, unknown>,
+    optionDecls: Map<string, OptionDeclaration>,
+): void {
+    for (const [key, decl] of optionDecls) {
+        if (!(key in resolved)) continue;
+        const apply = decl.apply ?? decl.type.apply;
+        if (apply) {
+            resolved[key] = apply(resolved[key]);
+        }
+    }
+}
+
 function evaluateAssertions(resolved: Record<string, unknown>): void {
     const assertions = resolved._assertions;
     if (!Array.isArray(assertions)) return;
@@ -249,6 +159,70 @@ function processWarnings(
     }
 }
 
+function createModuleArgs<TArgs extends Record<string, unknown> & { config?: never }>(
+    config: Record<string, unknown>,
+    options: EvalModulesOptions<TArgs>,
+): ModuleArgs<TArgs> {
+    const userArgs = options.args ?? {};
+    if ('config' in userArgs) {
+        throw new Error('Cannot override "config" in module args.');
+    }
+    return { ...userArgs, config } as ModuleArgs<TArgs>;
+}
+
+function buildMergedConfig(
+    base: Record<string, unknown>,
+    fragments: Array<Record<string, unknown>>,
+): {
+    merged: Record<string, unknown>;
+    optionDecls: Map<string, OptionDeclaration>;
+} {
+    const allFragments = [stripImports({ ...base }), ...fragments];
+    const optionDecls = extractOptions(allFragments);
+    const moduleSettings = readModuleSettings(allFragments);
+    const definitions = collectDefinitions(allFragments);
+
+    ensureImplicitOptions(optionDecls);
+
+    const merged: Record<string, unknown> = {};
+    for (const [key, defs] of definitions) {
+        const optionType = resolveOptionType(
+            key,
+            optionDecls,
+            moduleSettings.check,
+            moduleSettings.freeformType,
+        );
+        merged[key] = mergeKey(key, defs, optionType);
+    }
+
+    for (const [key] of optionDecls) {
+        if (key === '_assertions' || key === '_warnings') continue;
+        if (key in merged) continue;
+
+        const { hasDefault, value } = getOptionDefault(key, optionDecls);
+        if (hasDefault) {
+            merged[key] = value;
+        }
+    }
+
+    return { merged, optionDecls };
+}
+
+function finalizeModules(
+    resolved: Record<string, unknown>,
+    optionDecls: Map<string, OptionDeclaration>,
+    onWarning?: (message: string) => void,
+): Record<string, unknown> {
+    validateOptions(resolved, optionDecls);
+    applyOptionTransforms(resolved, optionDecls);
+    evaluateAssertions(resolved);
+    processWarnings(resolved, onWarning);
+
+    const stripped = stripSystemKeys(resolved);
+    const cleaned = deepCleanUndefined(stripped);
+    return (cleaned ?? {}) as Record<string, unknown>;
+}
+
 function stripSystemKeys(obj: Record<string, unknown>): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj)) {
@@ -259,9 +233,9 @@ function stripSystemKeys(obj: Record<string, unknown>): Record<string, unknown> 
 
 // ─── Module collection ──────────────────────────────────────────────
 
-function collectModules(
-    modules: ModuleFn[],
-    args: ModuleArgs,
+function collectModules<TArgs extends Record<string, unknown> & { config?: never }>(
+    modules: Array<ModuleFn<TArgs, Record<string, unknown>>>,
+    args: ModuleArgs<TArgs>,
 ): Array<Record<string, unknown>> {
     const ids = new WeakMap<Function, number>();
     let nextId = 1;
@@ -280,7 +254,7 @@ function collectModules(
 
     return extensions;
 
-    function visit(mod: ModuleFn): void {
+    function visit(mod: ModuleFn<TArgs, Record<string, unknown>>): void {
         if (visited.has(mod)) return;
         if (visiting.has(mod)) {
             const cycle = formatCycle(mod);
@@ -299,7 +273,7 @@ function collectModules(
         }
         assertPlainRecord(raw, formatModule(mod));
 
-        const imports = readImports(raw, formatModule(mod));
+        const imports = readImports<ModuleFn<TArgs, Record<string, unknown>>>(raw, formatModule(mod));
         for (const imp of imports) {
             visit(imp);
         }
@@ -324,9 +298,9 @@ function collectModules(
     }
 }
 
-async function collectModulesAsync(
-    modules: AsyncModuleFn[],
-    args: ModuleArgs,
+async function collectModulesAsync<TArgs extends Record<string, unknown> & { config?: never }>(
+    modules: Array<AsyncModuleFn<TArgs, Record<string, unknown>>>,
+    args: ModuleArgs<TArgs>,
 ): Promise<Array<Record<string, unknown>>> {
     const ids = new WeakMap<Function, number>();
     let nextId = 1;
@@ -345,7 +319,7 @@ async function collectModulesAsync(
 
     return extensions;
 
-    async function visit(mod: AsyncModuleFn): Promise<void> {
+    async function visit(mod: AsyncModuleFn<TArgs, Record<string, unknown>>): Promise<void> {
         if (visited.has(mod)) return;
         if (visiting.has(mod)) {
             const cycle = formatCycle(mod);
@@ -358,7 +332,7 @@ async function collectModulesAsync(
         const raw = await mod(args);
         assertPlainRecord(raw, formatModule(mod));
 
-        const imports = readImports(raw, formatModule(mod));
+        const imports = readImports<AsyncModuleFn<TArgs, Record<string, unknown>>>(raw, formatModule(mod));
         for (const imp of imports) {
             await visit(imp);
         }
@@ -383,10 +357,10 @@ async function collectModulesAsync(
     }
 }
 
-function readImports(
+function readImports<TModule extends (...args: never[]) => unknown>(
     moduleResult: Record<string, unknown>,
     moduleLabel: string,
-): ModuleFn[] {
+): TModule[] {
     if (!(IMPORTS_KEY in moduleResult)) return [];
 
     const value = moduleResult[IMPORTS_KEY];
@@ -395,14 +369,14 @@ function readImports(
         throw new Error(`Module ${moduleLabel} returned "${IMPORTS_KEY}" which is not an array.`);
     }
 
-    const imports: ModuleFn[] = [];
+    const imports: TModule[] = [];
     for (const item of value) {
         if (typeof item !== 'function') {
             throw new Error(
                 `Module ${moduleLabel} returned "${IMPORTS_KEY}" containing a non-function import.`,
             );
         }
-        imports.push(item as ModuleFn);
+        imports.push(item as TModule);
     }
     return imports;
 }
@@ -415,7 +389,7 @@ function stripImports(record: Record<string, unknown>): Record<string, unknown> 
 }
 
 function assertPlainRecord(val: unknown, moduleLabel: string): asserts val is Record<string, unknown> {
-    if (val === null || typeof val !== 'object' || Array.isArray(val)) {
+    if (!isPlainObject(val)) {
         throw new Error(`Module ${moduleLabel} must return a plain object record.`);
     }
 }
@@ -423,40 +397,5 @@ function assertPlainRecord(val: unknown, moduleLabel: string): asserts val is Re
 function createConfigProxy(
     getFinal: () => Record<string, unknown> | null,
 ): Record<string, unknown> {
-    return new Proxy(Object.create(null) as Record<string, unknown>, {
-        get(_: Record<string, unknown>, prop: string | symbol): unknown {
-            if (prop === '__isConfigProxy') return true;
-            const final = getFinal();
-            if (final === null) {
-                throw new Error(
-                    `Cannot eagerly access config.${String(prop)} during module evaluation. ` +
-                    `Wrap in defer(() => config.${String(prop)}).`,
-                );
-            }
-            return final[prop as string];
-        },
-        has(_: Record<string, unknown>, prop: string | symbol): boolean {
-            const final = getFinal();
-            if (final === null) {
-                throw new Error(`Cannot check 'config' membership during module evaluation.`);
-            }
-            return (prop as string) in final;
-        },
-        ownKeys(): Array<string | symbol> {
-            const final = getFinal();
-            if (final === null) {
-                throw new Error(`Cannot enumerate 'config' during module evaluation.`);
-            }
-            return Reflect.ownKeys(final);
-        },
-        getOwnPropertyDescriptor(_: Record<string, unknown>, prop: string | symbol): PropertyDescriptor | undefined {
-            const final = getFinal();
-            if (final === null) return undefined;
-            if ((prop as string) in final) {
-                return { value: final[prop as string], writable: true, enumerable: true, configurable: true };
-            }
-            return undefined;
-        },
-    });
+    return createLazyRecordProxy(getFinal, { name: 'config', phase: 'module evaluation' });
 }
-
